@@ -1,0 +1,15 @@
+name: timesink
+channels:
+  - defaults
+dependencies:
+  - python
+  - numpy
+  - pandas
+  - pip
+  - pip:
+      - dearpygui
+
+  # - pyarrow
+  # - scikit-learn
+  # - spyder-kernels=2.5
+  # - conda-forge::pyarrow
