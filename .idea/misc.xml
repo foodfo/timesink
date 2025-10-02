@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="$USER_HOME$/miniconda3/envs/timesink" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="$PROJECT_DIR$/../../miniconda3/envs/timesink" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="timesink" project-jdk-type="Python SDK" />
 </project>
