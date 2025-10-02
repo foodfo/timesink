@@ -1,7 +1,7 @@
-from zipfile import sizeEndCentDir
 
 import dearpygui.dearpygui as dpg
-from dearpygui.dearpygui import collapsing_header, hide_item, add_button, group
+import pandas as pd
+import numpy as np
 
 # put into utils
 WINDOW_TITLE = "TIMESINK"
@@ -83,7 +83,7 @@ with dpg.child_window(parent=primary_tab, border=False):
                     dpg.add_checkbox(label='Unlock X-Axis')
                     with dpg.group(horizontal=True):
                         dpg.add_button(label='+ Plot')
-                        dpg,add_button(label='- Plot')
+                        dpg.add_button(label='- Plot')
                     dpg.add_separator()
                     dpg.add_button(label='Add Parse Line')
                     dpg.add_button(label='Find Peak on Screen')
@@ -92,7 +92,7 @@ with dpg.child_window(parent=primary_tab, border=False):
             with dpg.child_window(label="Plot Controller",autosize_x=True, autosize_y=True, tag='Plot Controller'):
                 with dpg.tab_bar():
                     with dpg.tab(label='PLOTS') as plot_list:
-                        dpg.add_button(label="ADD DATA")
+                        dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog") )
                         with dpg.collapsing_header(label="Source 1",default_open=True):
                             dpg.add_button(label='Configure', callback=show_source_config)
                             dpg.add_button(label='Set X-Axis')
@@ -113,7 +113,7 @@ with dpg.child_window(parent=primary_tab, border=False):
             # for i in range(20):
             #     dpg.add_text("TEST TEST TEST")
             # TODO: periodically poll the width of the sidebar and adjust plot size accordingly. do the same for viewport height/width? or just run callback on viewport resize?
-            with dpg.plot(width=dpg.get_viewport_width()-dpg.get_item_width(sidebar)-40):
+            with dpg.plot(width=dpg.get_viewport_width()-dpg.get_item_width(sidebar)-40, tag='plot1'):
                 pass
             with dpg.plot():
                 pass
@@ -125,6 +125,7 @@ with dpg.window(label='Configure Data Source', modal=True, height=500, width=500
     with dpg.tab_bar():
         with dpg.tab(label='Fields'):
             dpg.add_input_text(label='File Label')
+            dpg.add_checkbox(label='Append Data Name tp Column Names', default_value=True)
             dpg.add_separator()
 
             with dpg.table(header_row=True, borders_innerH=True,
@@ -176,7 +177,26 @@ with dpg.window(label='Configure Data Source', modal=True, height=500, width=500
         #     dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 3 * 5)
         #     dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 3 * 3, 3 * 3)
 
-# dpg.configure_item("vp_bar",show=False)
+def add_data_to_tab(sender,app_data,user_data):
+    print(sender)
+    print(app_data)
+    print(app_data['file_path_name'])
+    df=pd.DataFrame
+    df=pd.read_csv(app_data['file_path_name'])
+    print(df.head)
+    print(df.columns)
+
+    dpg.add_plot_legend(parent='plot1')
+    dpg.add_plot_axis(dpg.mvXAxis, label="x",parent='plot1')
+    dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis1",parent='plot1')
+    dpg.add_line_series(np.array(df.iloc[:,0]), np.array(df.iloc[:,3]), label=app_data['file_name'], parent="y_axis1")
+
+
+with dpg.file_dialog(directory_selector=False,show=False,width=400,height=400, tag="file_dialog",callback=add_data_to_tab, default_path='/Users/tyler/Downloads'):
+    dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
+
+
+
 
 dpg.show_item_registry()
 dpg.set_primary_window(mainwin,True)
