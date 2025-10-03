@@ -1,38 +1,35 @@
 import dearpygui.dearpygui as dpg
+from math import sin
+
 dpg.create_context()
 
-def drag_cb(sender, app_data, user_data):
-    # sender is btn_drag
-    # app_data is btn_drag (value from drag_data)
-    # do some configure(drawing_item), animation
-    ...
+sindatax = []
+sindatay = []
+for i in range(0, 100):
+    sindatax.append(i / 100)
+    sindatay.append(0.5 + 0.5 * sin(50 * i / 100))
 
-def drop_cb(sender, app_data, user_data):
-    # sender is group, app_data is btn_drag
-    dpg.move_item(app_data, parent=sender)
+with dpg.window(label="Tutorial", width=400, height=400):
+    with dpg.plot(label="Multi Axes Plot", height=400, width=-1):
+        dpg.add_plot_legend()
 
-with dpg.window():
-    with dpg.group(horizontal=True):
+        # create x axis
+        dpg.add_plot_axis(dpg.mvXAxis, label="x")
 
-        with dpg.group(width=300, drop_callback=drop_cb, payload_type="int"):  # user_data=??
-            dpg.add_text("Group left")
-            dpg.add_button(label="not drag this")
+        # create y axis 1
+        dpg.add_plot_axis(dpg.mvYAxis, label="y1")
+        dpg.add_line_series(sindatax, sindatay, label="y1 lines", parent=dpg.last_item())
 
-        with dpg.group(width=300, drop_callback=drop_cb, payload_type="int"):
-            dpg.add_text("Group right")
-            dpg.add_button(label="not drag this")
-            btn_drag = dpg.add_button(label="drag me to another group then drop", drag_callback=drag_cb)
+        # create y axis 2
+        dpg.add_plot_axis(dpg.mvYAxis2, label="y2")
+        dpg.add_stem_series(sindatax, sindatay, label="y2 stem", parent=dpg.last_item())
 
-        with dpg.drag_payload(parent=btn_drag, drag_data=btn_drag, payload_type="int"):
-            dpg.add_text("dragging a button")
+        # create y axis 3
+        dpg.add_plot_axis(dpg.mvYAxis3, label="y3 scatter")
+        dpg.add_scatter_series(sindatax, sindatay, label="y3", parent=dpg.last_item())
 
-            # parent=btn_drag     --> this playload will appear if dragged from the btn_drag
-            # drag_data=btn_drag  --> btn_drag will be app_data in the above drag_cb and drop_cb
-            # payload_type="int"  --> btn_drag is an int, specified in this playload and drop target - two group above
-
-dpg.create_viewport()
+dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
 dpg.show_viewport()
-while dpg.is_dearpygui_running():
-    dpg.render_dearpygui_frame()
+dpg.start_dearpygui()
 dpg.destroy_context()

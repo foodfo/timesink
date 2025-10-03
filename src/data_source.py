@@ -48,7 +48,7 @@ class DataSource:
     def get_y_axis(self, col_name):
         return np.array(self.df[col_name], dtype=float)
 
-
+    # TODO: make the aliases the keys that way you can aliases.key to get the corresponding col_name
     @staticmethod
     def _init_alias_dict(df, file_name):
         alias_dict = {file_name: file_name}
