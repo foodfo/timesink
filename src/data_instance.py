@@ -3,11 +3,12 @@ import numpy as np
 import pandas as pd
 
 
-class DataSource:
+class DataInstance:
     def __init__(self, file_path, tag):
         self.file_path = file_path
         self.file_name = Path(file_path).stem
         self.tag = tag
+        self.manager_tag = tag
         self.df = self._convert_to_dataframe(file_path)
         self.alias = self._init_alias_dict(self.df, self.file_name)
         self.x_axis = None # consider making _x_axis marked private

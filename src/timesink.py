@@ -2,9 +2,8 @@
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-from dearpygui.dearpygui import set_item_label, get_item_label
 
-from data_source import DataSource
+from data_instance import DataInstance
 from src.plot_instance import PlotInstance
 
 # put into utils
@@ -24,6 +23,11 @@ NUM_PLOTS_ON_STARTUP = 2
 global showSide
 showSide = False
 downsample_percent = 100
+
+
+# region Feature Extraction
+test=5
+# endregion
 
 data = {} # key = UUID tag, value = DataSource
 plots = {} # key = UUID tag, value = PlotInstance
@@ -47,6 +51,9 @@ dpg.create_viewport(title=WINDOW_TITLE,width=VIEWPORT_WIDTH,height=VIEWPORT_HEIG
 dpg.setup_dearpygui()
 dpg.show_viewport()
 
+
+# ---------- Helper Functions ----------
+
 def hide_sidebar():
 
     global showSide
@@ -66,35 +73,6 @@ def show_source_config():
 
 
 
-with dpg.window(#width = dpg.get_viewport_width(), height = dpg.get_viewport_height(),pos=[0,MENU_BAR_HEIGHT+40],no_move=True,no_title_bar=True
-                ) as mainwin:
-    with dpg.menu_bar(tag='vp_bar', show=False):
-        with dpg.menu(label="File",): # not sure what to put here
-            pass
-        with dpg.menu(label="Options"): # some options and config maybe?
-            pass
-        with dpg.menu(label="Plot"): # plot options like crosshairs, num plots
-            pass
-        with dpg.menu(label="Export"): # export options:
-            dpg.add_menu_item(label="Truncate to View")
-            dpg.add_menu_item(label="Truncate between parsers")
-            dpg.add_menu_item(label="Truncate between every other parser")
-        with dpg.menu(label="Help"):
-            pass
-
-    with dpg.tab_bar(label = "test") as tabs:
-
-        dpg.add_tab_button(label="<<", tag="hide_sidebar",callback=hide_sidebar)
-        with dpg.tab(label="Tab 1", tag="tab1") as primary_tab:
-            pass
-        with dpg.tab(label="Tab 2", tag="tab2"):
-            pass
-        dpg.add_tab_button(label="+", tag="add_tab")
-#         pass
-#
-# with dpg.window(label=WINDOW_TITLE, width=600, height=300):
-#     pass
-
 def set_x_axis(sender, app_data, user_data):
     parent_tag = app_data['parent_tag']
     col_name = app_data['col_name']
@@ -110,14 +88,10 @@ def calculate_plot_height():
     return int((dpg.get_viewport_client_height()-TAB_BAR_HEIGHT) / num_plots)
 
 def set_all_plot_heights():
-
-    # num_plots = len(plots) if len(plots) else 1
-
     for tag in plots.keys():
-        # dpg.set_item_height(tag, calculate_plot_height())
         dpg.set_item_height(plots[tag].child, calculate_plot_height())
 
-
+# ---------- Helper Functions ----------
 
 def add_to_plot(sender, app_data, user_data):
     parent_tag = app_data['parent_tag']
@@ -152,12 +126,12 @@ def get_plot_number(tag):
 def rename_plot(sender,app_data):
     tag = dpg.get_item_parent(sender)
     plot_number = get_plot_number(tag)
-    set_item_label(tag,f'{app_data} {plot_number}')
+    dpg.set_item_label(tag,f'{app_data} {plot_number}')
 
 def show_plot_options(sender, app_data):
     dpg.add_button(label='set x-axis', parent=sender)
 
-def delete_plot_instance(sender, app_data): #delete the last added plot # TODO make a way to delete any plot
+def delete_last_plot_instance(sender, app_data): #delete the last added plot # TODO make a way to delete any plot
     # delete data from dict and also ge the tag of the collapsable window
     tag, pi = plots.popitem() # key, val # TODO: should probably made a plots.delete(tag) function and make plots a class that way logic is abstracted away from the functions
     dpg.delete_item(tag) # delete the options window
@@ -171,6 +145,11 @@ def select_plot_type(sender, app_data, user_data):
     show_plot_options(sender, app_data)
 
 def add_new_plot_instance():
+
+    plot_instance_tag = dpg.generate_uuid()
+    plot_manager_tag = dpg.generate_uuid()
+    plot_graph_tag = dpg.generate_uuid()
+
     pi = PlotInstance(tag=dpg.generate_uuid())
 
     plots[pi.tag] = pi
@@ -181,75 +160,103 @@ def add_new_plot_instance():
 
     plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot')
 
-    # with dpg.collapsing_header(parent=plot_list,default_open=True, tag=pi.tag):
-    with dpg.collapsing_header(parent=plot_list, default_open=True, tag=pi.tag):
-
-
+    with dpg.collapsing_header(parent=plot_manager_tab, default_open=True, tag=pi.tag):
         dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type)
         dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {plot_number}')
 
-    # with dpg.plot(width=-1, height=calculate_plot_height(), parent = plot_window, tag=(pi.tag, plot_number)): # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
-    with dpg.plot(width=-1, height=calculate_plot_height(), parent=plot_window, tag=pi.child):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
-
+    with dpg.plot(width=-1, parent=plot_window, tag=pi.child):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend()
         dpg.add_plot_axis(dpg.mvXAxis, label="x")
         dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
         print(dpg.last_container()) # TODO: figure out if y axis and x axis need thier own uuids as well then figure out how to access them
-        print(get_item_label(dpg.last_container()))
+        print(dpg.get_item_label(dpg.last_container()))
 
     set_all_plot_heights()
+
+def add_new_data_instance(sender, app_data, user_data):
+
+    data_instance_tag = dpg.generate_uuid()
+    data_manager_tag = dpg.generate_uuid()
+
+    ds = DataInstance(file_path=app_data['file_path_name'], tag=dpg.generate_uuid())
+
+    data[ds.tag] = ds
+
+    with dpg.collapsing_header(label=list(ds.alias.values())[0], default_open=True, tag=ds.tag, parent=data_manager_tab):
+
+        aliases = ds.get_column_aliases()
+
+        dpg.add_button(label='Configure', callback=show_source_config)
+        dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
+        dpg.add_separator()
+        with dpg.child_window(height=100):
+            for key, val in aliases: # skip the first alias since thats the filename. consider splitting these up
+                dpg.add_button(label=val)
+                with dpg.drag_payload(label=val,parent=dpg.last_item(),drag_data={'parent_tag':ds.tag,'col_name':key,'col_alias':val}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                    dpg.add_text(val)
+
+
+
+
+# main window with menu bar and tab instance containers
+with dpg.window() as mainwin:
+    with dpg.menu_bar(show=False):
+        with dpg.menu(label="File",): # not sure what to put here
+            pass
+        with dpg.menu(label="Options"): # some options and config maybe?
+            pass
+        with dpg.menu(label="Plot"): # plot options like crosshairs, num plots
+            pass
+        with dpg.menu(label="Export"): # export options:
+            dpg.add_menu_item(label="Truncate to View")
+            dpg.add_menu_item(label="Truncate between parsers")
+            dpg.add_menu_item(label="Truncate between every other parser")
+        with dpg.menu(label="Help"):
+            pass
+    with dpg.tab_bar(label = "test") as tabs:
+        dpg.add_tab_button(label="<<", tag="hide_sidebar",callback=hide_sidebar)
+        with dpg.tab(label="Tab 1", tag="tab1") as primary_tab:
+            pass
+        with dpg.tab(label="Tab 2", tag="tab2"):
+            pass
+        dpg.add_tab_button(label="+", tag="add_tab")
 
 
 # everything that sits in a single tab instance
 with dpg.child_window(parent=primary_tab, border=False):
     with dpg.group(horizontal=True):
         with dpg.child_window(resizable_x=True, width=SIDEBAR_WIDTH, border=False) as sidebar:
-            with dpg.child_window(label="Options",autosize_x=True, tag='Options', auto_resize_y=True):
+            with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True) as options_window:
                 with dpg.collapsing_header(label="Options",default_open=True):
                     dpg.add_text(f'Downsample %: {downsample_percent}%')
                     dpg.add_checkbox(label='Downsample Data')
                     dpg.add_checkbox(label='Unlock X-Axis')
-                    # with dpg.group(horizontal=True):
-                    #     dpg.add_button(label='+ Plot')
-                    #     dpg.add_button(label='- Plot')
-                    dpg.add_separator()
+                    dpg.add_checkbox(label='Bind cursor to screen')
+                    dpg.add_checkbox(label='Bind cursor to axis')
+                    dpg.add_separator(label='draggables')
                     dpg.add_button(label='Add Parse Line')
                     dpg.add_button(label='Find Peak on Screen')
                     dpg.add_button(label='Add Annotation')
 
-            with dpg.child_window(label="Plot Controller",autosize_x=True, autosize_y=True, tag='Plot Controller'):
+            with dpg.child_window(label="managers",autosize_x=True, autosize_y=True) as managers_window:
                 with dpg.tab_bar():
-                    with dpg.tab(label='DATA') as data_list:
+                    with dpg.tab(label='DATA') as data_manager_tab:
                         dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog") )
-                    with dpg.tab(label='PLOTS') as plot_list:
+                    with dpg.tab(label='PLOTS') as plot_manager_tab:
                         with dpg.group(horizontal=True):
-                            dpg.add_button(label="- Plot", callback=delete_plot_instance)
+                            dpg.add_button(label="- Plot", callback=delete_last_plot_instance)
                             dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
                         dpg.add_separator()
                         dpg.add_spacer(height=10)
-                    # with dpg.tab(label='CUSTOM FORMULAS'):
-                    #     pass
-                    # with dpg.tab(label='PRESETS'):
-                    #     pass
-    # with dpg.child_window(pos=(SIDEBAR_WIDTH+10,0), autosize_x=True, autosize_y=True) as plot_window:
+
+        # this is the actual plot area
         with dpg.child_window(autosize_x=True, autosize_y=True, border=False) as plot_window:
             for i in range(NUM_PLOTS_ON_STARTUP):
                 add_new_plot_instance()
-            # for i in range(20):
-            #     dpg.add_text("TEST TEST TEST")
-            # TODO: periodically poll the width of the sidebar and adjust plot size accordingly. do the same for viewport height/width? or just run callback on viewport resize?
-            # with dpg.plot(width=-1, height=calculate_plot_height(), tag='plot1'):
-            #     dpg.add_plot_legend(parent='plot1')
-            #     dpg.add_plot_axis(dpg.mvXAxis, label="x",parent='plot1')
-            #     dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis1",parent='plot1',drop_callback=add_to_plot)
-            # with dpg.plot(width=dpg.get_viewport_width() - dpg.get_item_width(sidebar) - 40, height=-1, tag='plot2'):
-            #     dpg.add_plot_legend(parent='plot2')
-            #     dpg.add_plot_axis(dpg.mvXAxis, label="x", parent='plot2')
-            #     dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis2", parent='plot2', drop_callback=add_to_plot)
-            # with dpg.plot():
-            #     pass
 
 
+
+# configure options for data instance (alias, preferred x axis, axis manipulation) # TODO: should probably live in plot_instance.py
 with dpg.window(label='Configure Data Source', modal=True, height=500, width=500, show=False, tag='Source_Config'):
     with dpg.tab_bar():
         with dpg.tab(label='Fields'):
@@ -310,32 +317,16 @@ with dpg.window(label='Configure Data Source', modal=True, height=500, width=500
 
 
 
-def add_new_data_source(sender,app_data,user_data):
-    ds = DataSource(file_path=app_data['file_path_name'],tag=dpg.generate_uuid())
-
-    data[ds.tag] = ds
-
-    with dpg.collapsing_header(label=list(ds.alias.values())[0], default_open=True,tag=ds.tag, parent=data_list):
-
-        aliases = ds.get_column_aliases()
-
-        dpg.add_button(label='Configure', callback=show_source_config)
-        dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
-        dpg.add_separator()
-        with dpg.child_window(height=100):
-            for key, val in aliases: # skip the first alias since thats the filename. consider splitting these up
-                dpg.add_button(label=val)
-                with dpg.drag_payload(label=val,parent=dpg.last_item(),drag_data={'parent_tag':ds.tag,'col_name':key,'col_alias':val}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-                    dpg.add_text(val)
 
 
+# opens importer file dialog and impor configurator. also will handle plugins/preprocessors - TODO: should probably move to its own file
 
 default_axis_choices = ('Indexes','First Column')
 quick_format_choices = ('None','OmegaTempLogger','ConvergenceInstruments')
 preprocessor_choices = ('None','WDH.py','WingTester.py','RainflowCounting.py')
 
 
-with dpg.file_dialog(directory_selector=False,show=False,width=400,height=400, tag="file_dialog",callback=add_new_data_source, default_path='/Users/tyler/Downloads'):
+with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400, tag="file_dialog", callback=add_new_data_instance, default_path='/Users/tyler/Downloads'):
     dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
     dpg.add_checkbox(label="Set Current Path as Default")
     with dpg.group(horizontal=True):
@@ -372,6 +363,9 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
     with dpg.group(horizontal=True):
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(import_config))
         dpg.add_button(label="Cancel")
+
+
+
 
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_item_registry()
