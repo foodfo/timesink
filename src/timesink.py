@@ -9,10 +9,10 @@ from src.plot_instance import PlotInstance
 
 # put into utils
 WINDOW_TITLE = "TIMESINK"
-VIEWPORT_HEIGHT = 1080
-VIEWPORT_WIDTH = 1920
-# VIEWPORT_HEIGHT = 700
-# VIEWPORT_WIDTH = 1200
+# VIEWPORT_HEIGHT = 1080
+# VIEWPORT_WIDTH = 1920
+VIEWPORT_HEIGHT = 700
+VIEWPORT_WIDTH = 1200
 WINDOW_PADDING = 8
 MENU_BAR_HEIGHT : int = 18
 SIDEBAR_WIDTH = 150
@@ -330,12 +330,48 @@ def add_new_data_source(sender,app_data,user_data):
 
 
 
+default_axis_choices = ('Indexes','First Column')
+quick_format_choices = ('None','OmegaTempLogger','ConvergenceInstruments')
+preprocessor_choices = ('None','WDH.py','WingTester.py','RainflowCounting.py')
 
 
 with dpg.file_dialog(directory_selector=False,show=False,width=400,height=400, tag="file_dialog",callback=add_new_data_source, default_path='/Users/tyler/Downloads'):
     dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
+    dpg.add_checkbox(label="Set Current Path as Default")
+    with dpg.group(horizontal=True):
+        dpg.add_combo(default_axis_choices,default_value = default_axis_choices[0])
+        dpg.add_checkbox(label='Set Default')
+    dpg.add_combo(quick_format_choices, default_value = quick_format_choices[0],label='Quick-Format Data')
+    dpg.add_combo(preprocessor_choices,default_value = preprocessor_choices[0]) # TODO: selecting a preproccessor should pop up a text box to request input. Ideally this would run the script to get a list of inputs to display
+    dpg.add_checkbox(label='Launch Import Configurator', callback = lambda: dpg.show_item(import_config))
 
 
+with dpg.window(label='Import Configurator',width=500, height=700, modal=True, show=False) as import_config:
+    dpg.add_input_int(label='Header Row Index') # check options and make type safe for int only
+    dpg.add_input_text(label='Drop Rows') # hint explains that this is an array that is later parsed
+    dpg.add_separator()
+
+    options = ['','Header','Rename','X-Axis Vals','To DateTime','Op 1', 'Op 2', 'Disable']
+
+    with dpg.table(header_row=True, borders_innerH=True,
+                   borders_outerH=True, borders_innerV=True, borders_outerV=True):
+        for i in options:
+            dpg.add_table_column(label=i) # TODO: figure out row sizing
+
+        for i in range(20): # TODO: have this be the count of columns
+            with dpg.table_row():
+                dpg.add_text(i)
+                dpg.add_text(f'_index #{i}') # TODO: get column header from file - use Header Row Index
+                dpg.add_input_text(no_spaces=True, width=100)
+                dpg.add_checkbox()
+                dpg.add_checkbox()
+                dpg.add_input_text(no_spaces=True, width=100)
+                dpg.add_input_text(no_spaces=True, width=100)
+                dpg.add_checkbox()
+
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(import_config))
+        dpg.add_button(label="Cancel")
 
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_item_registry()

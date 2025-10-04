@@ -1,32 +1,26 @@
 import dearpygui.dearpygui as dpg
-from math import sin
 
 dpg.create_context()
 
-sindatax = []
-sindatay = []
-for i in range(0, 100):
-    sindatax.append(i / 100)
-    sindatay.append(0.5 + 0.5 * sin(50 * i / 100))
+def callback(sender, app_data):
+    print("Sender: ", sender)
+    print("App Data: ", app_data)
 
-with dpg.window(label="Tutorial", width=400, height=400):
-    with dpg.plot(label="Multi Axes Plot", height=400, width=-1):
-        dpg.add_plot_legend()
+with dpg.file_dialog(directory_selector=False, show=False, callback=callback, file_count=3, tag="file_dialog_tag", width=700 ,height=400):
+    dpg.add_file_extension("", color=(255, 150, 150, 255))
+    dpg.add_file_extension(".*")
+    dpg.add_file_extension(".cpp", color=(255, 255, 0, 255))
+    dpg.add_file_extension(".h", color=(255, 0, 255, 255))
+    dpg.add_file_extension(".py", color=(0, 255, 0, 255))
 
-        # create x axis
-        dpg.add_plot_axis(dpg.mvXAxis, label="x")
+    dpg.add_button(label="fancy file dialog")
+    with dpg.child_window(width=100):
+        dpg.add_selectable(label="bookmark 1")
+        dpg.add_selectable(label="bookmark 2")
+        dpg.add_selectable(label="bookmark 3")
 
-        # create y axis 1
-        dpg.add_plot_axis(dpg.mvYAxis, label="y1")
-        dpg.add_line_series(sindatax, sindatay, label="y1 lines", parent=dpg.last_item())
-
-        # create y axis 2
-        dpg.add_plot_axis(dpg.mvYAxis2, label="y2")
-        dpg.add_stem_series(sindatax, sindatay, label="y2 stem", parent=dpg.last_item())
-
-        # create y axis 3
-        dpg.add_plot_axis(dpg.mvYAxis3, label="y3 scatter")
-        dpg.add_scatter_series(sindatax, sindatay, label="y3", parent=dpg.last_item())
+with dpg.window(label="Tutorial", width=800, height=300):
+    dpg.add_button(label="File Selector", callback=lambda: dpg.show_item("file_dialog_tag"))
 
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
