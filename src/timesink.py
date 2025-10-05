@@ -1,8 +1,10 @@
+from ctypes.wintypes import HINSTANCE
 
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 
+import data_instance
 from data_instance import DataInstance
 from src.plot_instance import PlotInstance
 
@@ -69,7 +71,7 @@ def hide_sidebar():
 
 
 def show_source_config():
-    dpg.configure_item('Source_Config',show=True)
+    dpg.configure_item(source_config,show=True)
 
 
 
@@ -88,8 +90,8 @@ def calculate_plot_height():
     return int((dpg.get_viewport_client_height()-TAB_BAR_HEIGHT) / num_plots)
 
 def set_all_plot_heights():
-    for tag in plots.keys():
-        dpg.set_item_height(plots[tag].child, calculate_plot_height())
+    for instance_tag in plots.keys():
+        dpg.set_item_height(plots[instance_tag].graph_tag, calculate_plot_height())
 
 # ---------- Helper Functions ----------
 
@@ -102,7 +104,7 @@ def add_to_plot(sender, app_data, user_data):
     print(data[parent_tag])
     x_axis = data[parent_tag].get_x_axis()
     y_axis = data[parent_tag].get_y_axis(col_name)
-    legend = data[parent_tag].get_filename_alias()[1] + '_' + col_alias # TODO: make filename alias easier to get
+    legend = data[parent_tag].file_alias + '_' + col_alias # TODO: make filename alias easier to get
 
     dpg.add_line_series(x_axis, y_axis, label=legend, parent=sender)
     print(f'sender: {sender}')
@@ -120,29 +122,33 @@ def add_line_plot(sender, app_data, user_data):
     parent_tag = app_data['parent_tag']
 
 
-def get_plot_number(tag):
-    return list(plots.keys()).index(tag) + 1 # 1 indexed rather than 0 indexed
+def get_plot_instance_number(instance_tag):
+    return list(plots.keys()).index(instance_tag) + 1 # 1 indexed rather than 0 indexed
 
-def rename_plot(sender,app_data):
-    tag = dpg.get_item_parent(sender)
-    plot_number = get_plot_number(tag)
-    dpg.set_item_label(tag,f'{app_data} {plot_number}')
+def rename_manager(sender, app_data, user_data):
+    dropdown_selection = app_data
+    manager_tag=user_data['manager_tag'] # is there a better way to do this than  passing the user_data?
+    instance_tag=user_data['instance_tag']
+    # manager_tag = dpg.get_item_parent(sender)
+    plot_number = get_plot_instance_number(instance_tag)
+    dpg.set_item_label(manager_tag,f'{dropdown_selection} {plot_number}')
 
 def show_plot_options(sender, app_data):
     dpg.add_button(label='set x-axis', parent=sender)
 
-def delete_last_plot_instance(sender, app_data): #delete the last added plot # TODO make a way to delete any plot
+def delete_last_plot_instance(sender, app_data): #delete the last added plot instance, manager, and graph # TODO make a way to delete any plot
     # delete data from dict and also ge the tag of the collapsable window
-    tag, pi = plots.popitem() # key, val # TODO: should probably made a plots.delete(tag) function and make plots a class that way logic is abstracted away from the functions
-    dpg.delete_item(tag) # delete the options window
-    dpg.delete_item(pi.child) #delete the plot
+    instance_tag, pi = plots.popitem() # key, val # TODO: should probably made a plots.delete(tag) function and make plots a class that way logic is abstracted away from the functions
+    dpg.delete_item(pi.manager_tag) # delete the options window
+    dpg.delete_item(pi.graph_tag) #delete the plot
     set_all_plot_heights()
 
 def select_plot_type(sender, app_data, user_data):
     print(sender)
     print(app_data)
-    rename_plot(sender,app_data)
+    rename_manager(sender, app_data, user_data)
     show_plot_options(sender, app_data)
+
 
 def add_new_plot_instance():
 
@@ -150,21 +156,21 @@ def add_new_plot_instance():
     plot_manager_tag = dpg.generate_uuid()
     plot_graph_tag = dpg.generate_uuid()
 
-    pi = PlotInstance(tag=dpg.generate_uuid())
+    pi = PlotInstance(instance_tag=plot_instance_tag, manager_tag=plot_manager_tag,graph_tag=plot_graph_tag)
 
-    plots[pi.tag] = pi
+    plots[pi.instance_tag] = pi
 
-    plot_number = get_plot_number(pi.tag)
+    instance_number = get_plot_instance_number(pi.instance_tag)
 
-    pi.set_child_tag(f'{pi.tag},{plot_number}')
+    user_data = {'instance_tag':plot_instance_tag,'manager_tag':plot_manager_tag,'graph_tag':plot_graph_tag} # there has to be a better way than sending the whole tree. If manager_tag and instance_tag are the same itll work though
 
     plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot')
 
-    with dpg.collapsing_header(parent=plot_manager_tab, default_open=True, tag=pi.tag):
-        dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type)
-        dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {plot_number}')
+    with dpg.collapsing_header(parent=plot_manager_tab, default_open=True, tag=pi.manager_tag):
+        dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data)
+        dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=plot_window, tag=pi.child):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=plot_window, tag=pi.graph_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend()
         dpg.add_plot_axis(dpg.mvXAxis, label="x")
         dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -178,22 +184,23 @@ def add_new_data_instance(sender, app_data, user_data):
     data_instance_tag = dpg.generate_uuid()
     data_manager_tag = dpg.generate_uuid()
 
-    ds = DataInstance(file_path=app_data['file_path_name'], tag=dpg.generate_uuid())
+    ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
 
-    data[ds.tag] = ds
+    data[ds.instance_tag] = ds
 
-    with dpg.collapsing_header(label=list(ds.alias.values())[0], default_open=True, tag=ds.tag, parent=data_manager_tab):
+    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=data_manager_tab):
 
-        aliases = ds.get_column_aliases()
+        dpg.add_button(label='Configure', callback=data_instance.configure_data, user_data=ds)
+        # dpg.configure_item(source_config, show=True)
 
-        dpg.add_button(label='Configure', callback=show_source_config)
         dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
         with dpg.child_window(height=100):
-            for key, val in aliases: # skip the first alias since thats the filename. consider splitting these up
-                dpg.add_button(label=val)
-                with dpg.drag_payload(label=val,parent=dpg.last_item(),drag_data={'parent_tag':ds.tag,'col_name':key,'col_alias':val}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-                    dpg.add_text(val)
+            for name in ds.col_names: # keys are aliasees, cols are df headers
+                alias = ds.get_alias_from_name(name)
+                dpg.add_button(label=alias)
+                with dpg.drag_payload(label=alias,parent=dpg.last_item(),drag_data={'parent_tag':ds.instance_tag,'col_name':name,'col_alias':alias}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                    dpg.add_text(alias)
 
 
 
@@ -257,7 +264,7 @@ with dpg.child_window(parent=primary_tab, border=False):
 
 
 # configure options for data instance (alias, preferred x axis, axis manipulation) # TODO: should probably live in plot_instance.py
-with dpg.window(label='Configure Data Source', modal=True, height=500, width=500, show=False, tag='Source_Config'):
+with dpg.window(label='Configure Data Source', modal=True, height=500, width=500, show=False) as source_config:
     with dpg.tab_bar():
         with dpg.tab(label='Fields'):
             dpg.add_input_text(label='File Label')
@@ -291,6 +298,7 @@ with dpg.window(label='Configure Data Source', modal=True, height=500, width=500
                 with dpg.table_row():
                     dpg.add_text('aceleration_z')
                     dpg.add_input_text(no_spaces=True, width=100)
+                    dpg.add_checkbox()
                     dpg.add_checkbox()
 
         with dpg.tab(label='Edit X-Axis'):
@@ -328,13 +336,14 @@ preprocessor_choices = ('None','WDH.py','WingTester.py','RainflowCounting.py')
 
 with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400, tag="file_dialog", callback=add_new_data_instance, default_path='/Users/tyler/Downloads'):
     dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
-    dpg.add_checkbox(label="Set Current Path as Default")
-    with dpg.group(horizontal=True):
-        dpg.add_combo(default_axis_choices,default_value = default_axis_choices[0])
-        dpg.add_checkbox(label='Set Default')
-    dpg.add_combo(quick_format_choices, default_value = quick_format_choices[0],label='Quick-Format Data')
-    dpg.add_combo(preprocessor_choices,default_value = preprocessor_choices[0]) # TODO: selecting a preproccessor should pop up a text box to request input. Ideally this would run the script to get a list of inputs to display
-    dpg.add_checkbox(label='Launch Import Configurator', callback = lambda: dpg.show_item(import_config))
+    # with dpg.group():
+    #     dpg.add_checkbox(label="Set Current Path as Default")
+    #     with dpg.group(horizontal=True):
+    #         dpg.add_combo(default_axis_choices,default_value = default_axis_choices[0])
+    #         dpg.add_checkbox(label='Set Default')
+    #     dpg.add_combo(quick_format_choices, default_value = quick_format_choices[0],label='Quick-Format Data')
+    #     dpg.add_combo(preprocessor_choices,default_value = preprocessor_choices[0]) # TODO: selecting a preproccessor should pop up a text box to request input. Ideally this would run the script to get a list of inputs to display
+    #     dpg.add_checkbox(label='Launch Import Configurator', callback = lambda: dpg.show_item(import_config))
 
 
 with dpg.window(label='Import Configurator',width=500, height=700, modal=True, show=False) as import_config:
