@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import dearpygui.dearpygui as dpg
-import random
+from utils import data
 
 
 class DataInstance:
@@ -45,17 +45,25 @@ class DataInstance:
         self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple
 
     def set_file_alias(self,text):
-        self.file_alias = text
+        if text == '' or None:
+            self.file_alias = self.file_name
+        else:
+            self.file_alias = text
 
-    def set_col_alias(self, header, alias):
-        # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == header), None)
-        old_alias = self.get_alias_from_name(header)
+    def set_col_alias(self, name, alias):
+        # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
+        if alias in self.col_aliases:
+            # raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
+            return
+        self._has_duplicate_alias = False
+
+        old_alias = self.get_alias_from_name(name)
         if alias == '' or None:
-            self.col_aliases_map[header] = self.col_aliases_map.pop(old_alias)
+            self.col_aliases_map[name] = self.col_aliases_map.pop(old_alias)
         else:
             self.col_aliases_map[alias] = self.col_aliases_map.pop(old_alias)
 
-        # IMPORTANT: regenerate the alias list and regenerate the column names mapping as theyre used by internal class logic
+        # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
         self.update_alias_list()
         self.col_names_map = reverse_dict_mapping(self.col_aliases_map)
 
@@ -137,62 +145,72 @@ def configure_data(sender, app_data, user_data) -> None:
 
     ds = user_data
     table_column_headers = ('Header', 'Alias','Set X-Axis')
-    COLS = len(table_column_headers)
-    ROWS = len(ds.col_aliases_map)
-    print(COLS)
-    print(ROWS)
-    table_tags = [[None for _ in range(COLS)] for _ in range(ROWS)]
     TEXT_BOX_WIDTH = 150
     COLUMN_RENAME_HEIGHT = 150
 
-    renamed_list = []
+    # init tags
+    file_alias_choice = None
+    prepend_alias_choice = None
+    x_axis_choice = None
+    datetime_choice = None
+    operation_choice = None
+    scalar_choice = None
+    duplicate_error = None
+
+    renamed_list = set() # TODO: rename these for clarity
+    stored_choices = set()
+
 
     def renamed_columns_callback(sender):
-        renamed_list.append(sender)
+        renamed_list.add(sender)
 
-    def set_x_axis_callback(sender):
-        ds.set_preferred_x_axis(dpg.get_value(sender))
+    def store_choices_callback(sender, app_data, user_data):
+        # stored_choices[sender] = app_data
+        stored_choices.add(sender)
 
-    def show_preview(sender, app_data, user_data):
+    def save_config_choices_callback(sender):
 
-        alias = user_data[0]
-        append = user_data[1]
+        if file_alias_choice in stored_choices and dpg.get_value(file_alias_choice): # skip if " "
+            ds.set_file_alias(dpg.get_value(file_alias_choice))
+            dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
 
-        random_col = random.choice(ds.col_aliases)
+        if x_axis_choice in stored_choices:
+            if ds.preferred_x_axis != dpg.get_value(x_axis_choice): # skip if its the same text
+                ds.set_preferred_x_axis(dpg.get_value(x_axis_choice))
 
-        if append:
-            dpg.set_item_label(preview, f'{alias}_{random_col}')
-        else:
-            dpg.set_item_label(preview,f'{random_col}')
+        # TODO: implement the other config options at some point
 
-    def print_table():
-        out = []
-        for r in range(ROWS):
-            arr = []
-            for c in range(COLS):
-                arr.append(dpg.get_value(table_tags[r][c]))
-            out.append(arr)
-        print(out)
+        for tag in renamed_list:
+            col_alias = dpg.get_value(tag)
+            col_name = dpg.get_item_label(tag)
 
-        for r in range(ROWS):
-            header_cell_tag=table_tags[r][0]
-            alias_cell_tag=table_tags[r][1]
-            xaxis_cell_tag=table_tags[r][2]
+            if col_alias in ds.col_aliases:
+                dpg.show_item(duplicate_error)
+                return
 
-            header = dpg.get_value(header_cell_tag)
-            alias = dpg.get_value(alias_cell_tag)
-            set_x_axis = dpg.get_value(xaxis_cell_tag)
+            if col_alias:
+                dpg.hide_item(duplicate_error)
+                ds.set_col_alias(col_name, col_alias)
+
+        dpg.delete_item(source_config)
+
+        print(ds.file_alias)
+        print(ds.preferred_x_axis)
+        print(ds.col_aliases_map)
+
+    def delete_config_window():
+        dpg.delete_item(source_config)
 
 
-            ds.set_col_alias(header, alias)
+    def delete_data_callback():
+        delete_config_window()
+        dpg.delete_item(ds.manager_tag) # delete manager
+        data.pop(ds.instance_tag) # TODO: see if theres a better way than storing the data in UTILS
 
-            print(ds.col_aliases_map)
 
-            print(renamed_list)
-            print(ds.preferred_x_axis)
-
-            if set_x_axis:
-                ds.set_preferred_x_axis(header)
+    with dpg.theme() as red_text_theme:
+        with dpg.theme_component(dpg.mvText):
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 0, 0, 255))  # RGBA
 
     with dpg.theme() as delete_theme:
         with dpg.theme_component(dpg.mvButton):
@@ -208,30 +226,25 @@ def configure_data(sender, app_data, user_data) -> None:
         # with dpg.tab(label='Fields'):
         dpg.add_separator(label='Rename File')
         with dpg.group(horizontal=True):
-            alias = dpg.add_input_text(label=ds.file_name,width=TEXT_BOX_WIDTH, default_value=ds.file_alias)
+            file_alias_choice = dpg.add_input_text(label=ds.file_name,width=TEXT_BOX_WIDTH, default_value=ds.file_alias, no_spaces=True, callback=store_choices_callback)
             dpg.add_spacer(width=25)
-            append = dpg.add_checkbox(label='Append', default_value=True)
+            prepend_alias_choice = dpg.add_checkbox(label='Prepend', default_value=True, callback=store_choices_callback)
             with dpg.tooltip(dpg.last_item()):
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
-        with dpg.group(horizontal=True):
-            dpg.add_button(label='Preview:',callback=show_preview, user_data=[alias,append])
-            dpg.add_spacer(width=15)
-            preview = dpg.add_text()
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            dpg.add_combo(ds.col_names,label='Set X-Axis',width=TEXT_BOX_WIDTH, default_value=ds.preferred_x_axis, callback=set_x_axis_callback)
+            x_axis_choice = dpg.add_combo(ds.col_names,label='Set X-Axis',width=TEXT_BOX_WIDTH, default_value=ds.preferred_x_axis, callback=store_choices_callback)
             dpg.add_spacer(width=25)
-            dpg.add_checkbox(label='DateTime?', default_value=False) # TODO: change this to degault_option
+            datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
         with dpg.group(horizontal=True):
             dpg.add_text('Scalar Operation')
-            dpg.add_combo(('None', 'Multiply', 'Divide'), default_value='None', width=80) # TODO: change this to default_option
-            dpg.add_input_float(step=0, step_fast=0, width=50,  format="%.1f")
+            operation_choice = dpg.add_combo(('None', 'Multiply', 'Divide'), default_value='None', width=80, callback=store_choices_callback) # TODO: change this to default_option
+            scalar_choice = dpg.add_input_float(step=0, step_fast=0, width=50,  format="%.1f", callback=store_choices_callback)
         dpg.add_separator(label='Rename Columns')
         with dpg.child_window(height=COLUMN_RENAME_HEIGHT, border=False, auto_resize_x=True):
             for name in ds.col_names:
                 alias = ds.get_alias_from_name(name)
                 dpg.add_input_text(label=name, default_value=alias, width=TEXT_BOX_WIDTH, no_spaces=True, auto_select_all=True, callback=renamed_columns_callback)
-
             # with dpg.tab(label='Edit X-Axis'):
             #     dpg.add_listbox(("AAAA", "BBBB", "CCCC", "DDDD"), label='ALTERNATE X-AXIS SOURCE')
             #     dpg.add_checkbox(label='Re-base axis')
@@ -240,11 +253,46 @@ def configure_data(sender, app_data, user_data) -> None:
             #     dpg.add_text('UTC offset')
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Cancel")
-            dpg.add_button(label="OK", callback=print_table)
+            dpg.add_button(label="Cancel", callback=delete_config_window)
+            dpg.add_button(label="OK", callback=save_config_choices_callback)
+            duplicate_error = dpg.add_text('NO DUPLICATE ALIAS ALLOWED', show=False) # TODO: make this not resize the window when it pops up. Unfortunately popups over modal does not seem possible
+            dpg.bind_item_theme(dpg.last_item(), red_text_theme)
             dpg.add_spacer(width=170)
-            dpg.add_button(label="Delete Series")
+            dpg.add_button(label="Delete Series", callback=delete_data_callback)
             dpg.bind_item_theme(dpg.last_item(), delete_theme)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+################################################################
+
 
         # with dpg.table(header_row=False, borders_innerH=False, borders_innerV=False, borders_outerH=False, borders_outerV=False):
         #     dpg.add_table_column()
@@ -277,3 +325,31 @@ def configure_data(sender, app_data, user_data) -> None:
 #             alias_cell_tag = dpg.add_input_text(no_spaces=True, width=100)
 #             xaxis_cell_tag = dpg.add_checkbox()
 #             table_tags[r] = [header_cell_tag, alias_cell_tag, xaxis_cell_tag]
+#     def print_table():
+#         out = []
+#         for r in range(ROWS):
+#             arr = []
+#             for c in range(COLS):
+#                 arr.append(dpg.get_value(table_tags[r][c]))
+#             out.append(arr)
+#         print(out)
+#
+#         for r in range(ROWS):
+#             header_cell_tag=table_tags[r][0]
+#             alias_cell_tag=table_tags[r][1]
+#             xaxis_cell_tag=table_tags[r][2]
+#
+#             header = dpg.get_value(header_cell_tag)
+#             alias = dpg.get_value(alias_cell_tag)
+#             set_x_axis = dpg.get_value(xaxis_cell_tag)
+#
+#
+#             ds.set_col_alias(header, alias)
+#
+#             print(ds.col_aliases_map)
+#
+#             print(renamed_list)
+#             print(ds.preferred_x_axis)
+#
+#             if set_x_axis:
+#                 ds.set_preferred_x_axis(header)

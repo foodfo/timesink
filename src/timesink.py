@@ -7,6 +7,7 @@ import numpy as np
 import data_instance
 from data_instance import DataInstance
 from src.plot_instance import PlotInstance
+from utils import data, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 
 # put into utils
 WINDOW_TITLE = "TIMESINK"
@@ -31,8 +32,8 @@ downsample_percent = 100
 test=5
 # endregion
 
-data = {} # key = UUID tag, value = DataSource
-plots = {} # key = UUID tag, value = PlotInstance
+# data = {} # key = UUID tag, value = DataSource
+# plots = {} # key = UUID tag, value = PlotInstance
 # graphs = [] # TODO: temporary just to get plots adding. consider putting plot manager and plot viewer TAGS in PI then reference PI by TAG
 #
 # class DataSourceRegistry:
@@ -183,6 +184,8 @@ def add_new_data_instance(sender, app_data, user_data):
 
     data_instance_tag = dpg.generate_uuid()
     data_manager_tag = dpg.generate_uuid()
+
+    # print(app_data)
 
     ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
 
@@ -374,6 +377,7 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="Cancel")
 
 
+add_new_data_instance(None, {'file_path_name':'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, None)
 
 
 dpg.set_viewport_resize_callback(set_all_plot_heights)
