@@ -1,2 +1,18 @@
 data = {} # key = UUID tag, value = DataSource
 plots = {} # key = UUID tag, value = PlotInstance
+
+
+
+# put into utils
+WINDOW_TITLE = "TIMESINK"
+# VIEWPORT_HEIGHT = 1080
+# VIEWPORT_WIDTH = 1920
+VIEWPORT_HEIGHT = 700
+VIEWPORT_WIDTH = 1200
+WINDOW_PADDING = 8
+MENU_BAR_HEIGHT : int = 18
+SIDEBAR_WIDTH = 150
+OPTIONS_HEIGHT = 200
+TAB_BAR_HEIGHT = 60 # TODO: tune this up a bit
+MAX_PLOTS_ON_SCREEN = 4
+NUM_PLOTS_ON_STARTUP = 2

@@ -2,6 +2,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import dearpygui.dearpygui as dpg
+import tags
 from utils import data
 
 
@@ -21,7 +22,9 @@ class DataInstance:
         self.col_aliases = self.col_names # initialize them the same
         self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
-        self.preferred_x_axis = self.df.columns[0]
+        self.source_x_axis = self.df.columns[0]
+        # self.source_x_axis = self.get_column(self.df.columns[0])
+        # self.source_x_axis_alias = self.source_x_axis[1]
 
 
 
@@ -39,7 +42,11 @@ class DataInstance:
         else:
             return None # TODO decide if this is enough protection
 
-        return (col_name, self.df[col_name])
+        return {
+                "name": col_name,
+                "alias": self.get_alias_from_name(col_name),
+                "data": self.df[col_name]
+            }# (name, alias, df[data])
 
     def update_alias_list(self):
         self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple
@@ -67,9 +74,10 @@ class DataInstance:
         self.update_alias_list()
         self.col_names_map = reverse_dict_mapping(self.col_aliases_map)
 
+    def set_source_x_axis(self, col_name):
+        # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
+        self.source_x_axis = col_name
 
-    def set_preferred_x_axis(self, col_name):
-        self.preferred_x_axis = col_name
 
 
     # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
@@ -139,10 +147,75 @@ class DataInstance:
 def reverse_dict_mapping(dict):
     return({val: key for key, val in dict.items()})
 
+def create_data_manager_items(ds):
+    if dpg.does_item_exist(ds.manager_tag):  # TODO: this feels like a really crude way to do this. consider something better
+        dpg.delete_item(ds.manager_tag,children_only=True)
+
+    with dpg.group(parent=ds.manager_tag):
+        dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
+        dpg.add_text(f'X-Axis: {ds.source_x_axis}')
+        # dpg.configure_item(source_config, show=True)
+        # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
+        dpg.add_separator()
+        with dpg.child_window(height=130, tag=ds.column_window_tag, resizable_y=True):
+            for name in ds.col_names:  # keys are aliasees, cols are df headers
+                alias = ds.get_alias_from_name(name)
+                dpg.add_button(label=alias)
+                with dpg.drag_payload(label=alias, parent=dpg.last_item(),
+                                      drag_data={'parent_tag': ds.instance_tag, 'col_name': name,
+                                                 'col_alias': alias}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                    dpg.add_text(alias)
+
+
+# def update_data_instance_columns(ds):
+#
+#     if dpg.does_item_exist(ds.column_window_tag): # TODO: this feels like a really crude way to do this. consider something better
+#         print('DELETING ITEM')
+#         dpg.delete_item(ds.column_window_tag)
+#
+#     with dpg.child_window(height=100, parent=ds.manager_tag, tag=ds.column_window_tag):
+#         for name in ds.col_names:  # keys are aliasees, cols are df headers
+#             alias = ds.get_alias_from_name(name)
+#             dpg.add_button(label=alias)
+#             with dpg.drag_payload(label=alias, parent=dpg.last_item(),drag_data={'parent_tag': ds.instance_tag, 'col_name': name,'col_alias': alias}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+#                 dpg.add_text(alias)
+
+def add_new_data_instance(sender, app_data, user_data):
+
+    target_container_tag = user_data #TODO: consider moving tags into utils so they can be referenced globally rather than being passed through as user data
+    data_instance_tag = dpg.generate_uuid()
+    data_manager_tag = dpg.generate_uuid()
+    column_window_tag = dpg.generate_uuid()
+
+    # print(app_data)
+
+    ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
+
+    data[ds.instance_tag] = ds
+
+    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag):
+        pass
+    create_data_manager_items(ds)
+
+    # with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag):
+    #
+    #     dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
+    #     # dpg.configure_item(source_config, show=True)
+    #     # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
+    #     dpg.add_separator()
+    #     update_data_instance_columns(ds)
+        # with dpg.child_window(height=100):
+        #     for name in ds.col_names: # keys are aliasees, cols are df headers
+        #         alias = ds.get_alias_from_name(name)
+        #         dpg.add_button(label=alias)
+        #         with dpg.drag_payload(label=alias,parent=dpg.last_item(),drag_data={'parent_tag':ds.instance_tag,'col_name':name,'col_alias':alias}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+        #             dpg.add_text(alias)
+
 
 # configure options for data instance (alias, preferred x axis, axis manipulation) # TODO: should probably live in data_instance.py
 def configure_data(sender, app_data, user_data) -> None:
 
+    parent_tag = dpg.get_item_parent(sender) # TODO consider wrapping this in user data for consistency?
     ds = user_data
     table_column_headers = ('Header', 'Alias','Set X-Axis')
     TEXT_BOX_WIDTH = 150
@@ -175,8 +248,8 @@ def configure_data(sender, app_data, user_data) -> None:
             dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
 
         if x_axis_choice in stored_choices:
-            if ds.preferred_x_axis != dpg.get_value(x_axis_choice): # skip if its the same text
-                ds.set_preferred_x_axis(dpg.get_value(x_axis_choice))
+            if ds.source_x_axis != dpg.get_value(x_axis_choice): # skip if its the same text
+                ds.set_source_x_axis(dpg.get_value(x_axis_choice))
 
         # TODO: implement the other config options at some point
 
@@ -192,14 +265,16 @@ def configure_data(sender, app_data, user_data) -> None:
                 dpg.hide_item(duplicate_error)
                 ds.set_col_alias(col_name, col_alias)
 
-        dpg.delete_item(source_config)
+        # update_data_instance_columns(ds)
+        create_data_manager_items(ds)
+        dpg.delete_item(tags.source_config)
 
         print(ds.file_alias)
-        print(ds.preferred_x_axis)
+        print(ds.source_x_axis)
         print(ds.col_aliases_map)
 
     def delete_config_window():
-        dpg.delete_item(source_config)
+        dpg.delete_item(tags.source_config)
 
 
     def delete_data_callback():
@@ -221,7 +296,7 @@ def configure_data(sender, app_data, user_data) -> None:
             # dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4)
 
 
-    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25)) as source_config:
+    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25), tag=tags.source_config):
         # with dpg.tab_bar():
         # with dpg.tab(label='Fields'):
         dpg.add_separator(label='Rename File')
@@ -233,7 +308,7 @@ def configure_data(sender, app_data, user_data) -> None:
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            x_axis_choice = dpg.add_combo(ds.col_names,label='Set X-Axis',width=TEXT_BOX_WIDTH, default_value=ds.preferred_x_axis, callback=store_choices_callback)
+            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.source_x_axis, callback=store_choices_callback)
             dpg.add_spacer(width=25)
             datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
         with dpg.group(horizontal=True):
@@ -349,7 +424,7 @@ def configure_data(sender, app_data, user_data) -> None:
 #             print(ds.col_aliases_map)
 #
 #             print(renamed_list)
-#             print(ds.preferred_x_axis)
+#             print(ds.source_x_axis)
 #
 #             if set_x_axis:
 #                 ds.set_preferred_x_axis(header)
