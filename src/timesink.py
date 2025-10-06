@@ -42,10 +42,10 @@ dpg.create_context()
 dpg.create_viewport(title=WINDOW_TITLE,width=VIEWPORT_WIDTH,height=VIEWPORT_HEIGHT)
 dpg.setup_dearpygui()
 dpg.show_viewport()
-dpg.show_debug()
+# dpg.show_debug()
 
 tags.init_tags()
-tags.print_tags()
+# tags.print_tags()
 
 
 # ---------- Helper Functions ----------
@@ -261,10 +261,10 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-# add_new_data_ instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
 
-dpg.show_debug()
+# dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_item_registry()
 dpg.set_primary_window(tags.mainwin,True)

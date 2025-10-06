@@ -24,7 +24,7 @@ class DataInstance:
         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
         self.source_x_axis = self.df.columns[0]
         # self.source_x_axis = self.get_column(self.df.columns[0])
-        # self.source_x_axis_alias = self.source_x_axis[1]
+        # self.x_alias = self.source_x_axis[1]
 
 
 
@@ -42,11 +42,13 @@ class DataInstance:
         else:
             return None # TODO decide if this is enough protection
 
-        return {
-                "name": col_name,
-                "alias": self.get_alias_from_name(col_name),
-                "data": self.df[col_name]
-            }# (name, alias, df[data])
+        # return {
+        #         "name": col_name,
+        #         "alias": self.get_alias_from_name(col_name),
+        #         "data": self.df[col_name]
+        #     }# (name, alias, df[data])
+
+        return (col_name,self.get_alias_from_name(col_name),self.df[col_name]) # (name, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
 
     def update_alias_list(self):
         self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple
@@ -76,7 +78,7 @@ class DataInstance:
 
     def set_source_x_axis(self, col_name):
         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
-        self.source_x_axis = col_name
+        self.source_x_axis = self.get_alias_from_name(col_name)
 
 
 
@@ -102,19 +104,19 @@ class DataInstance:
     #     first_key, first_val = next(iter(self.alias.items()))
     #     return first_key, first_val
 
-    def set_x_axis(self, col_name):
-        if self.x_axis is None:
-            self.x_axis = np.array(self.df[col_name], dtype=float)
-        else:
-            raise ValueError('X AXIS ALREADY ASSIGNED')  # TODO: somehow figure out how to manage series with more than 1 x axis. i think x axis needs to be assigned as a property of the plot, not of the data Y vals
-
-    def get_x_axis(self):
-        if self.x_axis is None: # TODO: make sure this actually works
-            return np.array(self.df['_index'], dtype=float)
-        return self.x_axis
-
-    def get_y_axis(self, col_name):
-        return np.array(self.df[col_name], dtype=float)
+    # def set_x_axis(self, col_name):
+    #     if self.x_axis is None:
+    #         self.x_axis = np.array(self.df[col_name], dtype=float)
+    #     else:
+    #         raise ValueError('X AXIS ALREADY ASSIGNED')  # TODO: somehow figure out how to manage series with more than 1 x axis. i think x axis needs to be assigned as a property of the plot, not of the data Y vals
+    #
+    # def get_x_axis(self):
+    #     if self.x_axis is None: # TODO: make sure this actually works
+    #         return np.array(self.df['_index'], dtype=float)
+    #     return self.x_axis
+    #
+    # def get_y_axis(self, col_name):
+    #     return np.array(self.df[col_name], dtype=float)
 
     # # TODO: make the aliases the keys that way you can aliases.key to get the corresponding col_name
     # @staticmethod
@@ -161,11 +163,11 @@ def create_data_manager_items(ds):
             for name in ds.col_names:  # keys are aliasees, cols are df headers
                 alias = ds.get_alias_from_name(name)
                 dpg.add_button(label=alias)
-                with dpg.drag_payload(label=alias, parent=dpg.last_item(),
-                                      drag_data={'parent_tag': ds.instance_tag, 'col_name': name,
-                                                 'col_alias': alias}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
+                                      drag_data={'instance_tag': ds.instance_tag, 'col_name': name}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
                     dpg.add_text(alias)
-
+                    # THIS IS MAPPED INTO PLOT INSTANCE
+                    # drag_data in payload becomes app_data in callback - kinda strange
 
 # def update_data_instance_columns(ds):
 #
@@ -193,7 +195,7 @@ def add_new_data_instance(sender, app_data, user_data):
 
     data[ds.instance_tag] = ds
 
-    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag):
+    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag): # TODO: plot_instance just uses tag.parent instead. consider that here
         pass
     create_data_manager_items(ds)
 
