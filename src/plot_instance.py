@@ -106,11 +106,11 @@ def add_new_plot_instance():
 
     plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot')
 
-    with dpg.collapsing_header(parent=plot_manager_tab, default_open=True, tag=pi.manager_tag):
+    with dpg.collapsing_header(parent=tags.plot_manager_tab, default_open=True, tag=pi.manager_tag):
         dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data)
         dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=plot_window, tag=pi.graph_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend()
         dpg.add_plot_axis(dpg.mvXAxis, label="x")
         dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source

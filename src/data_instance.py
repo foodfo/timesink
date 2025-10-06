@@ -157,7 +157,7 @@ def create_data_manager_items(ds):
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
-        with dpg.child_window(height=130, tag=ds.column_window_tag, resizable_y=True):
+        with dpg.child_window(height=130, resizable_y=True):
             for name in ds.col_names:  # keys are aliasees, cols are df headers
                 alias = ds.get_alias_from_name(name)
                 dpg.add_button(label=alias)
