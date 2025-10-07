@@ -218,7 +218,7 @@ def add_new_data_instance(sender, app_data, user_data):
 def configure_data(sender, app_data, user_data) -> None:
 
     parent_tag = dpg.get_item_parent(sender) # TODO consider wrapping this in user data for consistency?
-    ds = user_data
+    ds = user_data # TODO: consider passing tag in instead of the full object. does it matter?
     table_column_headers = ('Header', 'Alias','Set X-Axis')
     TEXT_BOX_WIDTH = 150
     COLUMN_RENAME_HEIGHT = 150
@@ -235,7 +235,7 @@ def configure_data(sender, app_data, user_data) -> None:
     renamed_list = set() # TODO: rename these for clarity
     stored_choices = set()
 
-
+    # stage changes for OK
     def renamed_columns_callback(sender):
         renamed_list.add(sender)
 
@@ -243,6 +243,7 @@ def configure_data(sender, app_data, user_data) -> None:
         # stored_choices[sender] = app_data
         stored_choices.add(sender)
 
+    # send changes on OK
     def save_config_choices_callback(sender):
 
         if file_alias_choice in stored_choices and dpg.get_value(file_alias_choice): # skip if " "
@@ -250,8 +251,8 @@ def configure_data(sender, app_data, user_data) -> None:
             dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
 
         if x_axis_choice in stored_choices:
-            if ds.source_x_axis != dpg.get_value(x_axis_choice): # skip if its the same text
-                ds.set_source_x_axis(dpg.get_value(x_axis_choice))
+            if ds.get_name_from_alias(ds.source_x_axis)!= dpg.get_value(x_axis_choice): # skip if its the same text
+                ds.set_source_x_axis(ds.get_alias_from_name(ds.get_value(x_axis_choice))) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
 
         # TODO: implement the other config options at some point
 
@@ -310,7 +311,7 @@ def configure_data(sender, app_data, user_data) -> None:
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.source_x_axis, callback=store_choices_callback)
+            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.get_name_from_alias(ds.source_x_axis), callback=store_choices_callback)
             dpg.add_spacer(width=25)
             datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
         with dpg.group(horizontal=True):
