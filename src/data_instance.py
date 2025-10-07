@@ -22,7 +22,7 @@ class DataInstance:
         self.col_aliases = self.col_names # initialize them the same
         self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
-        self.source_x_axis = self.df.columns[0]
+        self.source_x_axis_name = self.df.columns[0]
         # self.source_x_axis = self.get_column(self.df.columns[0])
         # self.x_alias = self.source_x_axis[1]
 
@@ -78,8 +78,7 @@ class DataInstance:
 
     def set_source_x_axis(self, col_name):
         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
-        self.source_x_axis = self.get_alias_from_name(col_name)
-
+        self.source_x_axis_name = col_name
 
 
     # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
@@ -155,7 +154,7 @@ def create_data_manager_items(ds):
 
     with dpg.group(parent=ds.manager_tag):
         dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_text(f'X-Axis: {ds.source_x_axis}')
+        dpg.add_text(f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}')
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
@@ -251,8 +250,8 @@ def configure_data(sender, app_data, user_data) -> None:
             dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
 
         if x_axis_choice in stored_choices:
-            if ds.get_name_from_alias(ds.source_x_axis)!= dpg.get_value(x_axis_choice): # skip if its the same text
-                ds.set_source_x_axis(ds.get_alias_from_name(ds.get_value(x_axis_choice))) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
+            if ds.source_x_axis_name != dpg.get_value(x_axis_choice): # skip if its the same text
+                ds.set_source_x_axis(dpg.get_value(x_axis_choice)) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
 
         # TODO: implement the other config options at some point
 
@@ -273,7 +272,7 @@ def configure_data(sender, app_data, user_data) -> None:
         dpg.delete_item(tags.source_config)
 
         print(ds.file_alias)
-        print(ds.source_x_axis)
+        print(ds.source_x_axis_name)
         print(ds.col_aliases_map)
 
     def delete_config_window():
@@ -311,7 +310,7 @@ def configure_data(sender, app_data, user_data) -> None:
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.get_name_from_alias(ds.source_x_axis), callback=store_choices_callback)
+            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.source_x_axis_name, callback=store_choices_callback) # choices are names, not aliases. this will return a name and it must be converted back to an alias
             dpg.add_spacer(width=25)
             datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
         with dpg.group(horizontal=True):

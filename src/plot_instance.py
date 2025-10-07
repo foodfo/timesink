@@ -1,3 +1,4 @@
+from multiprocessing.process import parent_process
 
 import dearpygui.dearpygui as dpg
 import pandas as pd
@@ -18,9 +19,10 @@ class PlotInstance:
         self.instance_tag = instance_tag
         self.manager_tag = manager_tag
         self.graph_tag = graph_tag
-        self.y1_tag = y1_tag # TODO: consider adding all axis tags to a set (y1,y2,y3,x1,x2,x3) may be a bit simpler?
-        self.series_list: Dict[int, PlotSeries] = {}
+        self.series_list: Dict[int, SeriesInstance] = {}
         self.global_style: str = 'Line Plot'
+        self.x_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid()] #, dpg.generate_uuid()] # can enable a 3rd x-axis possibly
+        self.y_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid(), dpg.generate_uuid()]
 
     # TODO: decide if these shallow methods are better than direct access
     # def set_graph_tag(self, tag):
@@ -32,31 +34,31 @@ class PlotInstance:
     # def set_global_style(self, style: str) -> None:
     #     self.global_style = style
 
-    def set_style(self, series_tag: int, style: str) -> None:
-        self.series_list[series_tag].style = style # TODO: consider whether or not this should have a dedicated accessor or just modify it directly
+    def set_style(self, sr_tag: int, style: str) -> None:
+        self.series_list[sr_tag].style = style # TODO: consider whether or not this should have a dedicated accessor or just modify it directly
 
-    def get_style(self, series_tag):
-        return self.series_list[series_tag].style
+    def get_style(self, sr_tag):
+        return self.series_list[sr_tag].style
 
-    def add_series(self, series_tag, series):
-        self.series_list[series_tag] = series
+    def add_series(self, sr_tag, series):
+        self.series_list[sr_tag] = series
 
-    def delete_series(self, series_tag):
-        sr = self.series_list.pop(series_tag)
+    def delete_series(self, sr_tag):
+        sr = self.series_list.pop(sr_tag)
         dpg.delete_item(sr.axis_tag)
 
-    def draw_series(self, series_tag, style, target_axis_tag):
+    def draw_series(self, sr_tag, style, parent_axis_tag):
 
-        sr = self.series_list[series_tag]
-        # sr.axis_tag = target_axis_tag
+        sr = self.series_list[sr_tag]
+        # sr.axis_tag = parent_axis_tag
         if style is None: style = sr.style # TODO: is there another way to do default input? style=None in fn declaration?
 
         legend = f'{sr.file_alias}_{sr.y_alias}'  # TODO: make filename alias easier to get
 
         if style == 'Line Plot': # old: line # TODO: can i abstract away the text some how? maybe with enum>
-            dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=target_axis_tag, tag=sr.axis_tag)
+            dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'Scatter Plot': # old scatter
-            dpg.add_scatter_series(sr.x_vals, sr.y_vals, label=legend, parent=target_axis_tag, tag=sr.axis_tag)
+            dpg.add_scatter_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'stem':
             pass
         elif style == 'area':
@@ -68,24 +70,25 @@ class PlotInstance:
         elif style == 'fft':
             pass
 
-    def delete_line(self, series_tag):
-        dpg.delete_item(self.series_list[series_tag].axis_tag)
+    def delete_line(self, sr_tag):
+        dpg.delete_item(self.series_list[sr_tag].mvseries_tag)
 
-    def change_plot_style(self, series_tag, style): # TODO: consider generalizing thsi to just (style, tag), and wrap the callback in a helper
+    def change_plot_style(self, sr_tag, style): # TODO: consider generalizing thsi to just (style, tag), and wrap the callback in a helper
         # FIRST DELETE, THEN REDRAW
-        sr = self.series_list[series_tag]
+        sr = self.series_list[sr_tag]
         sr.style = style
-        target_axis_tag = self.y1_tag # TODO: decide if parent or sender, check drawseries and callback root and clean up language
+        target_axis_tag = sr.parent_axis_tag # TODO: decide if parent or sender, check drawseries and callback root and clean up language
 
-        self.delete_line(series_tag)
-        self.draw_series(series_tag, style, target_axis_tag)
+        self.delete_line(sr_tag)
+        self.draw_series(sr_tag, style, target_axis_tag)
 
 
-class PlotSeries:
+class SeriesInstance:
     def __init__(self,
                  data_instance_tag: int,
-                 series_tag: int,
-                 axis_tag: int,
+                 instance_tag: int,
+                 parent_axis_tag: int,
+                 mvseries_tag: int,
                  file_alias: str,
                  x_name: str,
                  x_alias: str,
@@ -93,10 +96,11 @@ class PlotSeries:
                  y_name: str,
                  y_alias: str,
                  y_df: pd.Series,
-                 style: str,):
+                 style: str, ):
         self.data_instance_tag = data_instance_tag
-        self.series_tag: int =  series_tag
-        self.axis_tag = axis_tag
+        self.instance_tag: int =  instance_tag
+        self.parent_axis_tag = parent_axis_tag
+        self.mvseries_tag = mvseries_tag
         self.file_alias = file_alias
         self.x_name = x_name
         self.y_name = y_name
@@ -141,6 +145,7 @@ def add_to_plot(sender, app_data, user_data):
     print(f'tag passed OUT from user_data: {user_data}')
 
     user_data = dpg.get_item_user_data(sender)
+    parent_axis_tag = sender
     print(f'RETRY USER DATA GET: {user_data}')
 
     # 1.
@@ -150,19 +155,19 @@ def add_to_plot(sender, app_data, user_data):
     pi = plots[plot_instance_tag]
     ds = data[data_instance_tag]
     y_name, y_alias, y_df = ds.get_column(col_name)
-    x_name, x_alias, x_df = ds.get_column(ds.source_x_axis)
+    x_name, x_alias, x_df = ds.get_column(ds.source_x_axis_name)
     file_alias = ds.file_alias
-    series_tag = dpg.generate_uuid() # used in serie_list dict
-    axis_tag = dpg.generate_uuid() # the dpg tag for the actual lines on the graph
+    sr_instance_tag = dpg.generate_uuid() # used in serie_list dict
+    mvseries_tag = dpg.generate_uuid() # the dpg tag for the actual lines on the graph
     # print(plots)
     style = pi.global_style
     #2.
-    sr = PlotSeries(data_instance_tag,series_tag,axis_tag,file_alias,x_name,x_alias,x_df,y_name,y_alias,y_df,style)
+    sr = SeriesInstance(data_instance_tag, sr_instance_tag, parent_axis_tag, mvseries_tag, file_alias, x_name, x_alias, x_df, y_name, y_alias, y_df, style)
     #3.
-    pi.add_series(series_tag, sr) # TODO: once again, could direct access
+    pi.add_series(sr_instance_tag, sr) # TODO: once again, could direct access
     #4.
     # pi.draw_series(series_tag, None, sender)
-    pi.draw_series(series_tag, None, pi.y1_tag)
+    pi.draw_series(sr_instance_tag, None, parent_axis_tag)
 
 
 
@@ -212,6 +217,56 @@ def select_plot_type(sender, app_data, user_data):
     rename_manager(sender, app_data, user_data)
     show_plot_options(sender, app_data)
 
+def add_axis(sender, app_data, user_data):
+    pi = plots[user_data['instance_tag']]
+    axis = user_data['axis']
+
+    DEFAULT_Y_AXIS_LABELS = ['y1', 'y2', 'y3']
+    DEFAULT_X_AXIS_LABELS = ['x1', 'x2', 'x3']
+    DEFAULT_Y_AXIS_POSITION = [False,True,True]
+    DEFAULT_X_AXIS_POSITION = [False,False,False]
+    x_axis_constants = [dpg.mvXAxis, dpg.mvXAxis2, dpg.mvXAxis3]
+    y_axis_constants = [dpg.mvYAxis, dpg.mvYAxis2, dpg.mvYAxis3]
+    x_tags = pi.x_axis_tags
+    y_tags = pi.y_axis_tags
+
+    if axis == 'y':
+        labels= DEFAULT_Y_AXIS_LABELS
+        tags = y_tags
+        axis_constants  = y_axis_constants
+        position = DEFAULT_Y_AXIS_POSITION
+    else:
+        labels = DEFAULT_X_AXIS_LABELS
+        tags = x_tags
+        axis_constants  = x_axis_constants
+        position = DEFAULT_X_AXIS_POSITION
+
+
+    i = next((i for i,tag in enumerate(tags) if not dpg.does_item_exist(tag)), None) # todo: consider for loop instead of a generator link remove_last_axis
+    if i is None:
+        return
+    dpg.add_plot_axis(axis_constants[i], label=labels[i],tag=tags[i],opposite=position[i], parent = pi.graph_tag, drop_callback=add_to_plot,user_data=pi.instance_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+
+
+
+        # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag,
+        #                   tag=y1_tag)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+
+def remove_last_axis(sender, app_data, user_data):
+    pi = plots[user_data['instance_tag']]
+    axis = user_data['axis']
+
+    if axis == 'y':
+        tags = pi.y_axis_tags
+    else:
+        tags = pi.x_axis_tags
+
+    for tag in reversed(tags):
+        if dpg.does_item_exist(tag):
+            dpg.delete_item(tag)
+            break
+
+
 def add_new_plot_instance():
 
     plot_instance_tag = dpg.generate_uuid()
@@ -238,9 +293,12 @@ def add_new_plot_instance():
     with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend()
         dpg.add_plot_axis(dpg.mvXAxis, label="x")
-        dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+        # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
         # print(dpg.last_container()) # TODO: figure out if y axis and x axis need thier own uuids as well then figure out how to access them
         # print(dpg.get_item_label(dpg.last_container()))
+
+        add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'x'})
+        add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'y'})
 
     set_all_plot_heights()
 
@@ -255,21 +313,27 @@ def configure_plot(sender, app_data, user_data):
 
     def change_plot_style_callback(sender, app_data, user_data):
         style = app_data
-        series_tag = user_data
-        print(style, series_tag)
-        pi.change_plot_style(series_tag, style)
+        sr_tag = user_data
+        print(style, sr_tag)
+        pi.change_plot_style(sr_tag, style)
 
 
 
-    with dpg.window(label=f'Configure {plot_name}',pos=(50,200),autosize=True,no_move=True,modal=True):
+    with dpg.window(label=f'Configure {plot_name}',pos=(50,200),width=300, height=300): #,no_move=True,modal=True):
         with dpg.tab_bar():
             with dpg.tab(label='Global'):
                 dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type) # TODO: see if theres a better way to do this now that everything is a class
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label='+Y', callback=add_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
+                    dpg.add_button(label='-Y', callback=remove_last_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label='+X', callback=add_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
+                    dpg.add_button(label='-X', callback=remove_last_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
             with dpg.tab(label='Series'):
                 for tag, sr in pi.series_list.items():
                     with dpg.group(horizontal=True):
                         dpg.add_text(sr.y_alias)
-                        dpg.add_combo(plot_types, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.series_tag)
+                        dpg.add_combo(plot_types, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
                         dpg.add_combo(('Y1','Y2','Y3'),label='Y-Axis')
                         dpg.add_combo(('X1','X2'),label='X-Axis')
                         dpg.add_text(sr.x_alias) # TODO: change this to dropdown to choose x axis
