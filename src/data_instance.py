@@ -23,6 +23,7 @@ class DataInstance:
         self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
         self.source_x_axis_name = self.df.columns[0]
+        self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
         # self.source_x_axis = self.get_column(self.df.columns[0])
         # self.x_alias = self.source_x_axis[1]
 
@@ -59,12 +60,15 @@ class DataInstance:
         else:
             self.file_alias = text
 
+        # if self._is_prepended_alias:
+        #     for alias in self.col_aliases:
+        #         self.prepend_file_alias(alias)
+
     def set_col_alias(self, name, alias):
         # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
         if alias in self.col_aliases:
             # raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
             return
-        self._has_duplicate_alias = False
 
         old_alias = self.get_alias_from_name(name)
         if alias == '' or None:
@@ -80,6 +84,16 @@ class DataInstance:
         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
         self.source_x_axis_name = col_name
 
+    # def prepend_file_alias(self, col_alias):
+    #     col_name = self.get_name_from_alias(col_alias)
+    #     prepended_col_alias = self.file_alias + '_' + col_alias
+    #     self.set_col_alias(col_name, prepended_col_alias)
+    #
+    #
+    # def undo_prepend_file_alias(self, col_alias):
+    #     col_name = self.get_name_from_alias(col_alias):
+    #     undo_prepend_col_alias = col_alias.strip(self.file_alias + '_')
+    #     self.set_col_alias(col_name, undo_prepend_col_alias)
 
     # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
     #     self.alias.update(alias)
@@ -164,7 +178,12 @@ def create_data_manager_items(ds):
                 dpg.add_button(label=alias)
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
                                       drag_data={'instance_tag': ds.instance_tag, 'col_name': name}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-                    dpg.add_text(alias)
+
+                    if ds.is_prepended_alias:
+                        dragged_object_name = ds.file_alias + '_' + alias
+                    else:
+                        dragged_object_name = alias
+                    dpg.add_text(dragged_object_name)
                     # THIS IS MAPPED INTO PLOT INSTANCE
                     # drag_data in payload becomes app_data in callback - kinda strange
 
@@ -253,6 +272,12 @@ def configure_data(sender, app_data, user_data) -> None:
             if ds.source_x_axis_name != dpg.get_value(x_axis_choice): # skip if its the same text
                 ds.set_source_x_axis(dpg.get_value(x_axis_choice)) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
 
+        if prepend_alias_choice in stored_choices:
+            if dpg.get_value(prepend_alias_choice):
+                ds.is_prepended_alias = True
+            else:
+                ds.is_prepended_alias = False
+
         # TODO: implement the other config options at some point
 
         for tag in renamed_list:
@@ -305,7 +330,7 @@ def configure_data(sender, app_data, user_data) -> None:
         with dpg.group(horizontal=True):
             file_alias_choice = dpg.add_input_text(label=ds.file_name,width=TEXT_BOX_WIDTH, default_value=ds.file_alias, no_spaces=True, callback=store_choices_callback)
             dpg.add_spacer(width=25)
-            prepend_alias_choice = dpg.add_checkbox(label='Prepend', default_value=True, callback=store_choices_callback)
+            prepend_alias_choice = dpg.add_checkbox(label='Prepend', default_value=ds.is_prepended_alias, callback=store_choices_callback)
             with dpg.tooltip(dpg.last_item()):
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')

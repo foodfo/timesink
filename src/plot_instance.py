@@ -45,7 +45,7 @@ class PlotInstance:
 
     def delete_series(self, sr_tag):
         sr = self.series_list.pop(sr_tag)
-        dpg.delete_item(sr.axis_tag)
+        dpg.delete_item(sr.mvseries_tag)
 
     def draw_series(self, sr_tag, style, parent_axis_tag):
 
@@ -53,7 +53,8 @@ class PlotInstance:
         # sr.axis_tag = parent_axis_tag
         if style is None: style = sr.style # TODO: is there another way to do default input? style=None in fn declaration?
 
-        legend = f'{sr.file_alias}_{sr.y_alias}'  # TODO: make filename alias easier to get
+        # legend = f'{sr.file_alias}_{sr.y_alias}'  # TODO: make filename alias easier to get
+        legend = sr.y_alias
 
         if style == 'Line Plot': # old: line # TODO: can i abstract away the text some how? maybe with enum>
             dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
@@ -156,6 +157,11 @@ def add_to_plot(sender, app_data, user_data):
     ds = data[data_instance_tag]
     y_name, y_alias, y_df = ds.get_column(col_name)
     x_name, x_alias, x_df = ds.get_column(ds.source_x_axis_name)
+
+    if ds.is_prepended_alias:
+        y_alias = ds.file_alias + '_' + y_alias
+        x_alias = ds.file_alias + '_' + x_alias
+
     file_alias = ds.file_alias
     sr_instance_tag = dpg.generate_uuid() # used in serie_list dict
     mvseries_tag = dpg.generate_uuid() # the dpg tag for the actual lines on the graph
