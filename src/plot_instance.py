@@ -60,8 +60,9 @@ class PlotInstance:
             dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'Scatter Plot': # old scatter
             dpg.add_scatter_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
-        elif style == 'stem':
-            pass
+        elif style == 'Histogram':
+            num_bins = sr.n_bins
+            dpg.add_histogram_series(sr.y_vals, bins = sr.n_bins, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'area':
             pass
         elif style == 'bar':
@@ -113,6 +114,7 @@ class SeriesInstance:
         self.x_vals = self.x_df.tolist()  # Convert DataFrame/Series columns to Python lists
         self.y_vals = self.y_df.tolist()
         self.style = style
+        self.n_bins = 10
         self.h_mag = None
         self.h_bins = None
         self.fft_mag = None
