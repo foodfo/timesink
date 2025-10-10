@@ -1,4 +1,6 @@
 import dearpygui.dearpygui as dpg
+
+
 # TODO: audit this list to make sure it has the minimum required tags for best encapsulation
 source_config = None
 mainwin = None
@@ -11,6 +13,10 @@ data_manager_tab = None
 plot_manager_tab = None
 plot_window = None
 import_config = None
+manipulate = None
+input_window = None
+data_window = None
+output_window = None
 
 def init_tags():
     global source_config
@@ -24,6 +30,10 @@ def init_tags():
     global plot_manager_tab
     global plot_window
     global import_config
+    global manipulate
+    global input_window
+    global data_window
+    global output_window
 
     source_config = dpg.generate_uuid()
     mainwin = dpg.generate_uuid()
@@ -36,6 +46,10 @@ def init_tags():
     plot_manager_tab = dpg.generate_uuid()
     plot_window = dpg.generate_uuid()
     import_config = dpg.generate_uuid()
+    manipulate = dpg.generate_uuid()
+    input_window = dpg.generate_uuid()
+    data_window = dpg.generate_uuid()
+    output_window = dpg.generate_uuid()
 
 def print_tags():
     print(source_config)

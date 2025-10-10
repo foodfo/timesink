@@ -64,11 +64,11 @@ class DataInstance:
         #     for alias in self.col_aliases:
         #         self.prepend_file_alias(alias)
 
-    def set_col_alias(self, name, alias):
+    def set_col_alias(self, name, alias): # set new column alias for column that already exists
         # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
         if alias in self.col_aliases:
-            # raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
-            return
+            raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
+            # return
 
         old_alias = self.get_alias_from_name(name)
         if alias == '' or None:
@@ -83,6 +83,25 @@ class DataInstance:
     def set_source_x_axis(self, col_name):
         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
         self.source_x_axis_name = col_name
+
+    def add_new_column(self, data, col_name,col_alias):
+
+        if col_name in self.col_names:
+            raise ValueError('COLUMN NAME ALREADY PRESENT IN DATA')
+
+        if col_alias is None:
+            col_alias = col_name
+
+
+        self.df[col_name] = data
+        self.col_names_map[col_name] = col_alias
+
+        # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
+        self.col_aliases_map = reverse_dict_mapping((self.col_names_map))
+        self.update_alias_list()
+        self.col_names=tuple(self.df.columns)  # TODO: there MUST be a smoother way to update all of these items
+
+
 
     # def prepend_file_alias(self, col_alias):
     #     col_name = self.get_name_from_alias(col_alias)
@@ -200,6 +219,9 @@ def create_data_manager_items(ds):
 #             with dpg.drag_payload(label=alias, parent=dpg.last_item(),drag_data={'parent_tag': ds.instance_tag, 'col_name': name,'col_alias': alias}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
 #                 dpg.add_text(alias)
 
+
+
+
 def add_new_data_instance(sender, app_data, user_data):
 
     target_container_tag = user_data #TODO: consider moving tags into utils so they can be referenced globally rather than being passed through as user data
@@ -209,12 +231,25 @@ def add_new_data_instance(sender, app_data, user_data):
 
     # print(app_data)
 
+    with dpg.theme() as other_theme:
+        with dpg.theme_component(dpg.mvCollapsingHeader):
+            dpg.add_theme_color(dpg.mvThemeCol_Header, (10, 10, 10, 150))  # closed
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (10, 100,100, 200))  # hover
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (10, 10, 10, 255))  # open
+
+    # with dpg.theme() as other_theme:
+    #     with dpg.theme_component(dpg.mvCollapsingHeader):
+    #         pass  # empty for all buttons
+
     ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
 
     data[ds.instance_tag] = ds
 
     with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag): # TODO: plot_instance just uses tag.parent instead. consider that here
-        pass
+        dpg.bind_item_theme(dpg.last_item(), other_theme)
+        # dpg.bind_item_theme(dpg.last_item(), 0)
+
+
     create_data_manager_items(ds)
 
     # with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag):

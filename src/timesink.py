@@ -10,6 +10,7 @@ from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_
 from utils import data, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 from utils import * # TODO: temporary until I manage Globals better
 import tags
+from manipulate import manipulation_options
 
 
 global showSide
@@ -111,12 +112,31 @@ with dpg.window(tag=tags.mainwin):
         dpg.add_tab_button(label="+")
 
 
+#
+# with dpg.theme() as blue_header_theme:
+#     with dpg.theme_component(dpg.mvCollapsingHeader):
+#         dpg.add_theme_color(dpg.mvThemeCol_Header, (45, 95, 180, 150), category=dpg.mvThemeCat_Core)          # closed
+#         dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (70, 120, 220, 200), category=dpg.mvThemeCat_Core)  # hover
+#         dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (40, 90, 200, 255), category=dpg.mvThemeCat_Core)    # open
+
+with dpg.theme() as blue_header_theme:
+    with dpg.theme_component(dpg.mvCollapsingHeader):
+        dpg.add_theme_color(dpg.mvThemeCol_Header, (45, 95, 180, 150))          # closed
+        dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (70, 120, 220, 200))  # hover
+        dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (40, 90, 200, 255))    # open
+
+# with dpg.theme() as neutral_theme:
+#     pass
+
+
 # everything that sits in a single tab instance
 with dpg.child_window(parent=tags.primary_tab, border=False):
     with dpg.group(horizontal=True):
+            # with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=tags.options_window):
         with dpg.child_window(resizable_x=True, width=SIDEBAR_WIDTH, border=False, tag=tags.sidebar):
-            with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=tags.options_window):
-                with dpg.collapsing_header(label="Options",default_open=True):
+            with dpg.collapsing_header(label="Options",default_open=False):
+                dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
+                with dpg.child_window(auto_resize_y=True):
                     dpg.add_text(f'Downsample %: {downsample_percent}%')
                     dpg.add_checkbox(label='Downsample Data')
                     dpg.add_checkbox(label='Unlock X-Axis')
@@ -127,22 +147,38 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                     dpg.add_button(label='Find Peak on Screen')
                     dpg.add_button(label='Add Annotation')
 
-            with dpg.child_window(label="managers",autosize_x=True, autosize_y=True, tag=tags.managers_window):
-                with dpg.tab_bar():
-                    with dpg.tab(label='DATA', tag=tags.data_manager_tab):
-                        # dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog"), user_data=dpg.last_item())
-                        dpg.add_button(label="ADD DATA", callback=show_file_dialog, user_data=dpg.last_container())
-                        dpg.add_separator()
-                        dpg.add_spacer(height=10)
+        # with dpg.child_window(label="Options", autosize_x=True, auto_resize_y=True, border=False, always_use_window_padding=True):
+            with dpg.collapsing_header(label="Manipulations", default_open=False):
+                dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
+                with dpg.child_window(auto_resize_y=True, tag=tags.manipulate):
+                    manipulation_options()
 
-                    with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):
-                        with dpg.group(horizontal=True):
-                            dpg.add_button(label="- Plot", callback=delete_last_plot_instance)
-                            dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
-                        dpg.add_separator()
-                        dpg.add_spacer(height=10)
 
-        # this is the actual plot area
+            # with dpg.child_window(label="managers",autosize_x=True, autosize_y=True, tag=tags.managers_window):
+            #     with dpg.tab_bar():
+            #         with dpg.tab(label='DATA', tag=tags.data_manager_tab):
+
+            with dpg.collapsing_header(label='PLOTS', default_open=False):
+                dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
+                with dpg.child_window(auto_resize_y=True, tag=tags.plot_manager_tab):
+                    # with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(label="- Plot", callback=delete_last_plot_instance)
+                        dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
+                    dpg.add_separator()
+                dpg.add_spacer(height=10)
+            with dpg.collapsing_header(label='DATA', default_open=True):
+                dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
+                with dpg.child_window(auto_resize_y=True,tag = tags.data_manager_tab):
+                    # dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog"), user_data=dpg.last_item())
+                    dpg.add_button(label="ADD DATA", callback=show_file_dialog, user_data=dpg.last_container())
+                    dpg.add_separator()
+                    dpg.add_spacer(height=10)
+                    with dpg.group(tag = tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
+                        # dpg.bind_item_theme(tags.data_manager_tab, neutral_theme)
+                        pass
+
+            # this is the actual plot area
         with dpg.child_window(autosize_x=True, autosize_y=True, border=False, tag=tags.plot_window):
             for i in range(NUM_PLOTS_ON_STARTUP):
                 add_new_plot_instance()
@@ -261,8 +297,8 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)

@@ -68,6 +68,8 @@ class PlotInstance:
         elif style == 'bar':
             pass
         elif style == 'histogram':
+            sr.to_histogram()
+            dpg.add_scatter_series(sr.h_bins,sr.h_mags, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
             pass
         elif style == 'fft':
             pass
@@ -115,10 +117,14 @@ class SeriesInstance:
         self.y_vals = self.y_df.tolist()
         self.style = style
         self.n_bins = 10
-        self.h_mag = None
+        self.h_mags = None
         self.h_bins = None
         self.fft_mag = None
         self.fft_freq = None
+
+
+    def to_histogram():
+        pass
 
 
 
