@@ -101,7 +101,14 @@ class DataInstance:
         self.update_alias_list()
         self.col_names=tuple(self.df.columns)  # TODO: there MUST be a smoother way to update all of these items
 
+    def get_prepended_alias(self, alias):
+        if self.is_prepended_alias:
+            return self.file_alias + '_' + alias
+        else:
+            return alias
 
+    def get_drag_payload_data(self, col_name):
+        return {'instance_tag':self.instance_tag, 'col_name':col_name}
 
     # def prepend_file_alias(self, col_alias):
     #     col_name = self.get_name_from_alias(col_alias)
@@ -196,7 +203,7 @@ def create_data_manager_items(ds):
                 alias = ds.get_alias_from_name(name)
                 dpg.add_button(label=alias)
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
-                                      drag_data={'instance_tag': ds.instance_tag, 'col_name': name}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                                      drag_data=ds.get_drag_payload_data(name)):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
 
                     if ds.is_prepended_alias:
                         dragged_object_name = ds.file_alias + '_' + alias

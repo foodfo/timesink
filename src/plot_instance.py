@@ -3,6 +3,9 @@ from multiprocessing.process import parent_process
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
+from dearpygui.dearpygui import mvPlotScale_Linear, mvPlotScale_Log10, mvPlotScale_SymLog
+
+from src.data_instance import DataInstance
 from utils import plots, data
 from utils import * # TODO: temporary until I manage Globals better
 import tags
@@ -162,13 +165,13 @@ def add_to_plot(sender, app_data, user_data):
     data_instance_tag = app_data['instance_tag']
     col_name = app_data['col_name']
     pi = plots[plot_instance_tag]
-    ds = data[data_instance_tag]
+    ds: DataInstance = data[data_instance_tag]
     y_name, y_alias, y_df = ds.get_column(col_name)
     x_name, x_alias, x_df = ds.get_column(ds.source_x_axis_name)
 
-    if ds.is_prepended_alias:
-        y_alias = ds.file_alias + '_' + y_alias
-        x_alias = ds.file_alias + '_' + x_alias
+
+    y_alias = ds.get_prepended_alias(y_alias)
+    x_alias = ds.get_prepended_alias(x_alias)
 
     file_alias = ds.file_alias
     sr_instance_tag = dpg.generate_uuid() # used in serie_list dict
@@ -259,8 +262,8 @@ def add_axis(sender, app_data, user_data):
     i = next((i for i,tag in enumerate(tags) if not dpg.does_item_exist(tag)), None) # todo: consider for loop instead of a generator link remove_last_axis
     if i is None:
         return
-    dpg.add_plot_axis(axis_constants[i], label=labels[i],tag=tags[i],opposite=position[i], parent = pi.graph_tag, drop_callback=add_to_plot,user_data=pi.instance_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-
+    dpg.add_plot_axis(axis_constants[i], label=labels[i],tag=tags[i],opposite=position[i], parent = pi.graph_tag, drop_callback=add_to_plot,user_data=pi.instance_tag, scale=mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+    # TODO: expose no-highlight in main options bar to change global behavior
 
 
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag,
@@ -304,7 +307,7 @@ def add_new_plot_instance():
     #     dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data) # TODO: see if theres a better way to do this now that everything is a class
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend()
         dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -337,6 +340,45 @@ def configure_plot(sender, app_data, user_data):
         with dpg.tab_bar():
             with dpg.tab(label='Global'):
                 dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type) # TODO: see if theres a better way to do this now that everything is a class
+
+                with dpg.table(header_row=True, borders_innerH=True,borders_outerH=True) as table:
+                    dpg.add_table_column(label='Enable Axis')
+                    dpg.add_table_column(label='Axis Label')
+                    dpg.add_table_column(label='Axis Alias')
+                    dpg.add_table_column(label='Scale')
+                    # dpg.add_table_column(label='')
+
+                    plot_styles = ('Linear','Log','Date')
+
+                    with dpg.table_row():
+                        dpg.add_button(label='Y Axis 1')
+                        dpg.add_combo(('_index','time'))
+                        dpg.add_input_text(width=100)
+                        dpg.add_combo(plot_styles)
+                    with dpg.table_row():
+                        dpg.add_button(label='Y Axis 2')
+                        dpg.add_combo(('_index','time'))
+                        dpg.add_input_text(width=100)
+                        dpg.add_combo(plot_styles)
+                        dpg.add_checkbox(label='Invert')
+                        dpg.add_checkbox(label='Hide Label')
+                        dpg.add_checkbox(label='Hide Axis')
+                    with dpg.table_row():
+                        dpg.add_button(label='X Axis 1')
+                        dpg.add_combo(('_index','time'))
+                        dpg.add_input_text(width=100)
+                        dpg.add_combo(plot_styles)
+                    with dpg.table_row():
+                        dpg.add_button(label='X Axis 2')
+                        dpg.add_combo(('_index','time'))
+                        dpg.add_input_text(width=100)
+                        dpg.add_combo(plot_styles)
+                    with dpg.table_row():
+                        dpg.add_button(label='X Axis 3')
+                        dpg.add_combo(('_index', 'time'))
+                        dpg.add_input_text(width=100)
+                        dpg.add_combo(plot_styles)
+
                 with dpg.group(horizontal=True):
                     dpg.add_button(label='+Y', callback=add_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
                     dpg.add_button(label='-Y', callback=remove_last_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})

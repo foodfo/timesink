@@ -114,11 +114,8 @@ def compute_scalar():
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
     out_alias = ds.get_alias_from_name(out_name)
 
+    alias = ds.get_prepended_alias(out_alias)
 
-    if ds.is_prepended_alias:
-        alias = ds.file_alias +'_'+ds.get_alias_from_name(out_name) # TODO: consider an ds.exported_alias which wraps this logic. this logic is used in 3x places so far
-    else:
-        alias = ds.get_alias_from_name(out_name)
 
     # print('CONVERSION COMPLETE')
     # print(alias)
@@ -127,7 +124,7 @@ def compute_scalar():
 
     # TODO: consider wrapping this in a function to abstract sending the data so compute_ can have narrow scope
     dpg.configure_item(output_draggable, label=out_alias, show=True)
-    dpg.add_drag_payload(label=alias, parent=output_draggable,drag_data={'instance_tag': ds.instance_tag, 'col_name': out_name}) # TODO: consider making this output something that the ds object creates for consistency
+    dpg.add_drag_payload(label=alias, parent=output_draggable,drag_data=ds.get_drag_payload_data(out_name)) # TODO: consider making this output something that the ds object creates for consistency
 
     create_data_manager_items(ds) # required to update ds manager appropriately
 
@@ -157,16 +154,75 @@ def compute_algebra():
     if not ok_to_compute():
         return
 
+    out_name = dpg.get_value(output_name)
+
+    # input and format user algebraic expression
     user_expression = dpg.get_value('input').lower().strip()
     if user_expression == "":
         return
 
-    (_,_,x) = data[dpg.get_item_user_data('x')['instance_tag']].get_column(dpg.get_item_user_data('x')['col_name'])
-    (_,_,y) = data[dpg.get_item_user_data('x')['instance_tag']].get_column(dpg.get_item_user_data('x')['col_name'])
-    (_,_,z) = data[dpg.get_item_user_data('x')['instance_tag']].get_column(dpg.get_item_user_data('x')['col_name'])
+    # get x,y,z if user_data exists
+    if dpg.get_item_user_data('x'):
+        (_,_,x) = data[dpg.get_item_user_data('x')['instance_tag']].get_column(dpg.get_item_user_data('x')['col_name'])
+    else:
+        x=None
+    if dpg.get_item_user_data('y'):
+        (_,_,y) = data[dpg.get_item_user_data('y')['instance_tag']].get_column(dpg.get_item_user_data('y')['col_name'])
+    else:
+        y = None
+    if dpg.get_item_user_data('z'):
+        (_,_,z) = data[dpg.get_item_user_data('z')['instance_tag']].get_column(dpg.get_item_user_data('z')['col_name'])
+    else:
+        z = None
 
-    print(x.head)
-    print(user_expression)
+    if x is None:
+        raise ValueError('X MUST BE DEFINED')
+
+    # get min column length and truncate other values to min length
+    min_length = min(len(var) for var in (x,y,z) if var is not None)
+
+    x = x[:min_length]
+    if y is not None:
+        y = y[:min_length]
+    if z is not None:
+        z = z[:min_length]
+
+    math_dict = {
+        'sin': np.sin,
+        'cos': np.cos,
+        'tan': np.tan,
+        'sqrt': np.sqrt,
+        'pi': np.pi,
+        'e': np.e,
+        'ln': np.log,
+        'log10': np.log10,
+        'max': np.max,
+        'min': np.min,
+        'abs': np.abs,
+    }
+
+    var_dict = {
+        'x': x,
+        'y': y,
+        'z': z
+    }
+
+
+    output_data = pd.eval(user_expression, local_dict={**math_dict, **var_dict})
+
+    # append data to x-value source
+    ds = data[dpg.get_item_user_data('x')['instance_tag']]
+
+    ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
+    out_alias = ds.get_alias_from_name(out_name)
+
+    alias = ds.get_prepended_alias(out_alias)
+
+    # TODO: consider wrapping this in a function to abstract sending the data so compute_ can have narrow scope
+    dpg.configure_item(output_draggable, label=out_alias, show=True)
+    dpg.add_drag_payload(label=alias, parent=output_draggable,drag_data=ds.get_drag_payload_data(out_name)) # TODO: consider making this output something that the ds object creates for consistency
+
+    create_data_manager_items(ds) # required to update ds manager appropriately
 
 
 def populate_window_handler(which):
