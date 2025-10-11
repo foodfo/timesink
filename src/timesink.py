@@ -309,8 +309,8 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
