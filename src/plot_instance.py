@@ -146,11 +146,12 @@ def add_to_plot(sender, app_data, user_data):
 
     # add axis to current plot instance
     # 1. get data to add to PlotData
-    # 2. create PlotAxes which holds plot type and tags, defining the x and y axis for plotting - alos handles converting axes around for different plot types (FFT, Histogram)
-    # 3. add PlotAxes to PlotInstance
-    # 4. plot line with selected style
+    # 2. process params for alternate inputs
+    # 3. create PlotAxes which holds plot type and tags, defining the x and y axis for plotting - alos handles converting axes around for different plot types (FFT, Histogram)
+    # 4. add PlotAxes to PlotInstance
+    # 5. plot line with selected style
 
-
+    DEFAULT_HISTOGRAM_BINS = 10 # TODO: decide where this should go
 
     print(dpg.get_item_label(sender))
     # print(app_data)
@@ -164,11 +165,44 @@ def add_to_plot(sender, app_data, user_data):
     plot_instance_tag = user_data # TODO: decide if theres an easier way to init the PlotSeries
     data_instance_tag = app_data['instance_tag']
     col_name = app_data['col_name']
+    extra_params = app_data['extra_params'] # TODO: decide if/how to implement params. setting new x axis with FFT will cuase issues when we call get_prepended_alias. maybe guard this get fn to just pass any results not in the source
+    params = {k:v for k,v in extra_params.items() if v is not None}
+
+
     pi = plots[plot_instance_tag]
     ds: DataInstance = data[data_instance_tag]
-    y_name, y_alias, y_df = ds.get_column(col_name)
-    x_name, x_alias, x_df = ds.get_column(ds.source_x_axis_name)
 
+    #2. Process Params for alternate inputs
+    if params.get('alt_x_axis'):
+        source_x_axis_name = params['alt_x_axis']
+    else:
+        source_x_axis_name = ds.source_x_axis_name
+
+    if params.get('axis_style'):
+        style = params['axis_style']
+    else:
+        style = pi.global_style
+
+    if params.get('histogram_bins'):
+        h_bins = params['histogram_bins']
+    else:
+        h_bins = DEFAULT_HISTOGRAM_BINS
+
+    if params.get('FFT_magnitudes_arr'):
+        fft_mag = params['FFT_magnitudes_arr']
+    else:
+        fft_mag = None
+
+    if params.get('FFT_frequencies_arr'):
+        fft_freq = params['FFT_frequencies_arr']
+    else:
+        fft_freq = None
+
+
+
+
+    y_name, y_alias, y_df = ds.get_column(col_name)
+    x_name, x_alias, x_df = ds.get_column(source_x_axis_name)
 
     y_alias = ds.get_prepended_alias(y_alias)
     x_alias = ds.get_prepended_alias(x_alias)
@@ -177,14 +211,13 @@ def add_to_plot(sender, app_data, user_data):
     sr_instance_tag = dpg.generate_uuid() # used in serie_list dict
     mvseries_tag = dpg.generate_uuid() # the dpg tag for the actual lines on the graph
     # print(plots)
-    style = pi.global_style
-    #2.
-    sr = SeriesInstance(data_instance_tag, sr_instance_tag, parent_axis_tag, mvseries_tag, file_alias, x_name, x_alias, x_df, y_name, y_alias, y_df, style)
+
     #3.
-    pi.add_series(sr_instance_tag, sr) # TODO: once again, could direct access
+    sr = SeriesInstance(data_instance_tag, sr_instance_tag, parent_axis_tag, mvseries_tag, file_alias, x_name, x_alias, x_df, y_name, y_alias, y_df, style)
     #4.
-    # pi.draw_series(series_tag, None, sender)
-    pi.draw_series(sr_instance_tag, None, parent_axis_tag)
+    pi.add_series(sr_instance_tag, sr) # TODO: once again, could direct access
+    #5.
+    pi.draw_series(sr_instance_tag, style, parent_axis_tag)
 
 
 
@@ -335,49 +368,61 @@ def configure_plot(sender, app_data, user_data):
         pi.change_plot_style(sr_tag, style)
 
 
+    def edit_series_style_callback(sender, app_data, user_data):
+        line_color = ('Red', 'Yellow', 'Blue')
+        line_style = ('Line', 'Dashed', 'Dotted')
+        line_weight = ('Thin', 'Medium', 'Thick')
+        marker_style = ('None', 'Circle', 'Square')
+        marker_fill = ('Fill', 'Empty')
 
-    with dpg.window(label=f'Configure {plot_name}',pos=(50,200),width=300, height=300): #,no_move=True,modal=True):
+        with dpg.window(label='Line Style Editor', autosize=True):
+
+            dpg.add_combo(line_color, label='Line Color')
+            dpg.add_combo(line_style, label='Line Style')
+            dpg.add_combo(line_weight, label='Line Weight')
+            dpg.add_combo(marker_style, label='Marker')
+            dpg.add_combo(marker_fill, label='Marker Fill')
+
+
+
+    with dpg.window(label=f'Configure {plot_name}',pos=(50,200), autosize=True): #,no_move=True,modal=True):
+
+        TEXT_BOX_WIDTH = 150 # TODO: consider making this global
+        CHECK_BOX_WIDTH = 50
+
         with dpg.tab_bar():
             with dpg.tab(label='Global'):
-                dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type) # TODO: see if theres a better way to do this now that everything is a class
+                dpg.add_separator(label='Plot')
+                with dpg.group(horizontal=True):
+                    dpg.add_input_text(label='Plot Name', width=TEXT_BOX_WIDTH)
+                    dpg.add_checkbox(label='Hide Plot Name')
+                    dpg.add_checkbox(label='Hide legend')
+                dpg.add_separator(label="Global Style")
+                dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, width=TEXT_BOX_WIDTH) # TODO: see if theres a better way to do this now that everything is a class
+                dpg.add_separator(label='Axes')
 
                 with dpg.table(header_row=True, borders_innerH=True,borders_outerH=True) as table:
-                    dpg.add_table_column(label='Enable Axis')
-                    dpg.add_table_column(label='Axis Label')
-                    dpg.add_table_column(label='Axis Alias')
-                    dpg.add_table_column(label='Scale')
-                    # dpg.add_table_column(label='')
+                    dpg.add_table_column(label='Enable Axis', width_fixed=True)
+                    dpg.add_table_column(label='Axis Label', width_fixed=True)
+                    dpg.add_table_column(label='Axis Alias', width_fixed=True)
+                    dpg.add_table_column(label='Scale', width_fixed=True)
+                    # dpg.add_table_column(label='Invert',width_fixed=True,width=20) $ TODO: decide if this adds value or not
+                    dpg.add_table_column(label='Hide Label',width_fixed=True,width=20)
+                    dpg.add_table_column(label='Hide Axis',width_fixed=True,width=20)
 
-                    plot_styles = ('Linear','Log','Date')
+                    plot_scale = ('Linear','Log','Date')
+                    axis_list = ('Y Axis 1','Y Axis 2','X Axis 1','X Axis 2','X Axis 3')
 
-                    with dpg.table_row():
-                        dpg.add_button(label='Y Axis 1')
-                        dpg.add_combo(('_index','time'))
-                        dpg.add_input_text(width=100)
-                        dpg.add_combo(plot_styles)
-                    with dpg.table_row():
-                        dpg.add_button(label='Y Axis 2')
-                        dpg.add_combo(('_index','time'))
-                        dpg.add_input_text(width=100)
-                        dpg.add_combo(plot_styles)
-                        dpg.add_checkbox(label='Invert')
-                        dpg.add_checkbox(label='Hide Label')
-                        dpg.add_checkbox(label='Hide Axis')
-                    with dpg.table_row():
-                        dpg.add_button(label='X Axis 1')
-                        dpg.add_combo(('_index','time'))
-                        dpg.add_input_text(width=100)
-                        dpg.add_combo(plot_styles)
-                    with dpg.table_row():
-                        dpg.add_button(label='X Axis 2')
-                        dpg.add_combo(('_index','time'))
-                        dpg.add_input_text(width=100)
-                        dpg.add_combo(plot_styles)
-                    with dpg.table_row():
-                        dpg.add_button(label='X Axis 3')
-                        dpg.add_combo(('_index', 'time'))
-                        dpg.add_input_text(width=100)
-                        dpg.add_combo(plot_styles)
+                    for ax in axis_list:
+                        with dpg.table_row(user_data=ax):
+                            dpg.add_button(label=ax, width=100)
+                            dpg.add_combo(('_index', 'time'), width=75)
+                            dpg.add_input_text(width=TEXT_BOX_WIDTH)
+                            dpg.add_combo(plot_scale, width=50)
+                            # dpg.add_checkbox()
+                            dpg.add_checkbox(indent=25)
+                            dpg.add_checkbox(indent=25)
+
 
                 with dpg.group(horizontal=True):
                     dpg.add_button(label='+Y', callback=add_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
@@ -385,16 +430,13 @@ def configure_plot(sender, app_data, user_data):
                 with dpg.group(horizontal=True):
                     dpg.add_button(label='+X', callback=add_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
                     dpg.add_button(label='-X', callback=remove_last_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
-            with dpg.tab(label='Series'):
+            with dpg.tab(label='Per Series'):
                 for tag, sr in pi.series_list.items():
                     with dpg.group(horizontal=True):
-                        dpg.add_text(sr.y_alias)
+                        dpg.add_button(label=sr.y_alias, callback=edit_series_style_callback)
                         dpg.add_combo(plot_types, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
-                        dpg.add_combo(('Y1','Y2','Y3'),label='Y-Axis')
-                        dpg.add_combo(('X1','X2'),label='X-Axis')
-                        dpg.add_text(sr.x_alias) # TODO: change this to dropdown to choose x axis
-            with dpg.tab(label='X-Axis'):
-                pass
+                        dpg.add_text(f'Source X-Axis: {sr.x_alias}')
+
         with dpg.group(horizontal=True):
             dpg.add_button(label='Cancel')
             dpg.add_button(label='OK')

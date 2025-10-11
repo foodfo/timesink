@@ -24,6 +24,7 @@ class DataInstance:
         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
         self.source_x_axis_name = self.df.columns[0]
         self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
+        self._extra_drag_payload_params = self._init_extra_drag_payload_params(self)
         # self.source_x_axis = self.get_column(self.df.columns[0])
         # self.x_alias = self.source_x_axis[1]
 
@@ -107,8 +108,13 @@ class DataInstance:
         else:
             return alias
 
+
+
+    def set_extra_drag_payload_params(self, col_name, user_params):
+        self._extra_drag_payload_params[col_name] = user_params
+
     def get_drag_payload_data(self, col_name):
-        return {'instance_tag':self.instance_tag, 'col_name':col_name}
+        return {'instance_tag':self.instance_tag, 'col_name':col_name, 'extra_params':self._extra_drag_payload_params[col_name]}
 
     # def prepend_file_alias(self, col_alias):
     #     col_name = self.get_name_from_alias(col_alias)
@@ -164,6 +170,20 @@ class DataInstance:
     #     for header in df.columns:
     #         alias_dict[header] = header
     #     return alias_dict
+
+    @staticmethod
+    def _init_extra_drag_payload_params(self):
+        all_params_dict = {}
+        for name in self.col_names:
+            params = {
+                'alt_x_axis': None,
+                'axis_style': None,
+                'histogram_bins': None,
+                'FFT_magnitudes_arr': None,
+                'FFT_frequencies_arr': None
+            }
+            all_params_dict[name] = params
+        return all_params_dict
 
     @staticmethod
     def _convert_to_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
