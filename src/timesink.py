@@ -158,7 +158,7 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
             #     with dpg.tab_bar():
             #         with dpg.tab(label='DATA', tag=tags.data_manager_tab):
 
-            with dpg.collapsing_header(label='PLOTS', default_open=False):
+            with dpg.collapsing_header(label='PLOTS', default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.plot_manager_tab):
                     # with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):
