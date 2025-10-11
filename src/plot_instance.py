@@ -375,6 +375,9 @@ def add_new_plot_instance():
 
     set_all_plot_heights()
 
+
+
+
 def configure_plot(sender, app_data, user_data):
     pi: PlotInstance = user_data
     # TODO: delete window if it already exists. similar to earlier window whihc makes sure its the only one of its type. right now you can make 2 config windows
@@ -384,6 +387,18 @@ def configure_plot(sender, app_data, user_data):
     # plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot') # TODO Rename plot_styles but this should move somewhere else
 
     line_style = ('Line', 'Scatter', 'Segmented Line', 'Area Fill')
+
+    with dpg.theme() as activated_axis:
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (10, 100, 100, 200))  # closed
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (10, 100, 100, 170))  # hover
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (10, 100, 100, 200))
+
+    with dpg.theme() as deactivated_axis:
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (51, 51, 55, 255))  # closed
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (10, 100, 100, 170))  # hover
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (10, 100, 100, 200))
 
     def change_plot_name_callback(sender, app_data):
         pi.plot_name = app_data
@@ -399,12 +414,15 @@ def configure_plot(sender, app_data, user_data):
         pi.options['show_legend'] = app_data
         dpg.configure_item(pi.legend_tag, show=pi.options['show_legend'])
 
-    def highlight_axis_callback(sender, app_data):
+    def highlight_axis_callback(sender, app_data): # TODO: consider making this global instead of local to each plot
         pi.options['highlight_axis_on_hover'] = app_data
         dpg.configure_item(pi.legend_tag, no_highlight_axis=not pi.options['highlight_axis_on_hover'])
 
-
-
+    def change_enable_theme(sender,app_data):
+        if dpg.get_item_theme(sender) == activated_axis:
+            dpg.bind_item_theme(sender, deactivated_axis)
+        else:
+            dpg.bind_item_theme(sender, activated_axis)
 
 
     def change_plot_style_callback(sender, app_data, user_data):
@@ -413,6 +431,17 @@ def configure_plot(sender, app_data, user_data):
         print(style, sr_tag)
         pi.change_plot_style(sr_tag, style)
 
+    def get_list_of_series_in_axis(tag):
+        # contents = dpg.get_item_children(tag)[1] # axes stored in slot 1
+        print(pi.series_list)
+        print(tag)
+        series_list = [sr for sr in pi.series_list.values() if sr.parent_axis_tag == tag]
+        print(series_list)
+        names = [sr.y_alias for sr in series_list]
+        print(names)
+        if len(names) == 0:
+            return ()
+        return names
 
     def edit_series_style_callback(sender, app_data, user_data):
         line_color = ('Red', 'Yellow', 'Blue')
@@ -458,12 +487,15 @@ def configure_plot(sender, app_data, user_data):
                     dpg.add_table_column(label='Hide Axis',width_fixed=True,width=20)
 
                     plot_scale = ('Linear','Log','Date')
-                    axis_list = ('Y Axis 1','Y Axis 2','X Axis 1','X Axis 2','X Axis 3')
+                    axis_list = {'Y Axis 1':pi.y_axis_tags[0],'Y Axis 2':pi.y_axis_tags[1],'Y Axis 3':pi.y_axis_tags[2],'X Axis 1':pi.x_axis_tags[0],'X Axis 2':pi.y_axis_tags[1]}
 
-                    for ax in axis_list:
-                        with dpg.table_row(user_data=ax):
-                            dpg.add_button(label=ax, width=100)
-                            dpg.add_combo(('_index', 'time'), width=75)
+
+                    for name, tag in axis_list.items():
+                        axis_dropdowns = get_list_of_series_in_axis(tag)
+                        with dpg.table_row(user_data=tag):
+                            dpg.add_button(label=name, width=100, callback=change_enable_theme)
+                            dpg.bind_item_theme(dpg.last_item(), deactivated_axis)
+                            dpg.add_combo(axis_dropdowns, width=75)
                             dpg.add_input_text(width=TEXT_BOX_WIDTH)
                             dpg.add_combo(plot_scale, width=50)
                             # dpg.add_checkbox()
