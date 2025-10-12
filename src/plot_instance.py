@@ -419,18 +419,33 @@ def configure_plot(sender, app_data, user_data):
         pi.options['highlight_axis_on_hover'] = app_data
         dpg.configure_item(pi.legend_tag, no_highlight_axis=not pi.options['highlight_axis_on_hover'])
 
+    def hide_row(tag, show):
+        for idx, child in enumerate(dpg.get_item_children(tag)[1]):
+            if idx == 0:
+                continue
+            dpg.configure_item(child, show=show)
+
     def change_enable_theme(sender,app_data, user_data):
         if dpg.get_item_theme(sender) == activated_axis:
             dpg.bind_item_theme(sender, deactivated_axis)
             # dpg.set_item_user_data(sender, False)
-            user_data['enable']=False
-            show_rest_of_table(user_data)
+            user_data['show']=False
+            hide_row(user_data['parent_row'], user_data['show'])
+
+            # show_rest_of_table(user_data)
         else:
             dpg.bind_item_theme(sender, activated_axis)
             # dpg.set_item_user_data(sender, True)
-            user_data['enable']=True
+            user_data['show']=True
+            hide_row(user_data['parent_row'], user_data['show'])
+            # show_rest_of_table(user_data)
 
-            show_rest_of_table(user_data)
+    def hide_axis_label(sender, app_data, user_data):
+        user_data['hide_axis']=app_data
+        set_axis_alias(user_data['axis_alias'],user_data)
+
+    def hide_axis():
+        pass
 
 
 
@@ -458,13 +473,18 @@ def configure_plot(sender, app_data, user_data):
         if not dpg.does_item_exist(tag):
             return None
         current_scale = dpg.get_item_configuration(tag)['scale']
-        return next((label for label, scale in axis_scale.items() if scale == current_scale), None)
+        return next((label for label, scale in axis_scale.items() if scale == current_scale), None) # reverse dictionary lookup
 
     def set_axis_scale(sender, app_data, user_data):
-        dpg.configure_item(user_data, scale=axis_scale[app_data])
+        dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
 
     def set_axis_alias(sender, app_data, user_data):
-        dpg.configure_item(user_data, label=app_data)
+        user_data['axis_alias'] = app_data
+        if user_data['hide_axis']:
+            label=None
+        else:
+            label=app_data
+        dpg.configure_item(user_data['axis_tag'], label=app_data)
 
     def edit_series_style_callback(sender, app_data, user_data):
         line_color = ('Red', 'Yellow', 'Blue')
@@ -480,22 +500,22 @@ def configure_plot(sender, app_data, user_data):
             dpg.add_combo(marker_style, label='Marker')
             dpg.add_combo(marker_fill, label='Marker Fill')
 
-    def show_rest_of_table(user_data):
-        # name = user_data['name']
-        tag = user_data['tag']
-        enable = user_data['enable']
-
-        dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_axis_alias, user_data=tag, show=enable, parent=tag)
-        series_names = get_list_of_series_in_axis(tag)
-        if series_names:
-            with dpg.tooltip(
-                    dpg.last_item()):  # TODO: this tooltip is great but add a right cliclk menu to auto populate an input from selection. do not go back to combo input
-                for name in series_names:
-                    dpg.add_text(name)
-        dpg.add_combo(list(axis_scale.keys()), width=50, callback=set_axis_scale, user_data=tag, default_value=get_current_axis_scale(tag), show=enable)
-        # dpg.add_checkbox()
-        dpg.add_checkbox(indent=25,show=enable)
-        dpg.add_checkbox(indent=25,show=enable)
+    # def show_rest_of_table(user_data):
+    #     # name = user_data['name']
+    #     tag = user_data['tag']
+    #     enable = user_data['enable']
+    #
+    #     dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_axis_alias, user_data=tag, show=enable)
+    #     series_names = get_list_of_series_in_axis(tag)
+    #     if series_names:
+    #         with dpg.tooltip(
+    #                 dpg.last_item()):  # TODO: this tooltip is great but add a right cliclk menu to auto populate an input from selection. do not go back to combo input
+    #             for name in series_names:
+    #                 dpg.add_text(name)
+    #     dpg.add_combo(list(axis_scale.keys()), width=50, callback=set_axis_scale, user_data=tag, default_value=get_current_axis_scale(tag), show=enable)
+    #     # dpg.add_checkbox()
+    #     dpg.add_checkbox(indent=25,show=enable)
+    #     dpg.add_checkbox(indent=25,show=enable)
 
 
 
@@ -517,7 +537,7 @@ def configure_plot(sender, app_data, user_data):
                 # dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, width=TEXT_BOX_WIDTH) # TODO: see if theres a better way to do this now that everything is a class
                 dpg.add_separator(label='Axes')
 
-                with dpg.table(header_row=True, borders_innerH=True,borders_outerH=True) as table:
+                with dpg.table(header_row=True, borders_innerH=True,borders_outerH=True):
                     dpg.add_table_column(label='Enable Axis', width_fixed=True)
                     # dpg.add_table_column(label='Axis Label', width_fixed=True)
                     dpg.add_table_column(label='Axis Alias', width_fixed=True)
@@ -527,26 +547,25 @@ def configure_plot(sender, app_data, user_data):
                     dpg.add_table_column(label='Hide Axis',width_fixed=True,width=20)
 
                     axis_list = {'Y Axis 1':pi.y_axis_tags[0],'Y Axis 2':pi.y_axis_tags[1],'Y Axis 3':pi.y_axis_tags[2],'X Axis 1':pi.x_axis_tags[0],'X Axis 2':pi.x_axis_tags[1]}
-
+                    default_enable = {'Y Axis 1':True,'Y Axis 2':False,'Y Axis 3':False,'X Axis 1':True,'X Axis 2':False}
 
                     for name, tag in axis_list.items():
-                        # axis_dropdowns = get_list_of_series_in_axis(tag)
                         with dpg.table_row(user_data=tag):
-                            dpg.add_button(label=name, width=100, callback=change_enable_theme, user_data={'enable':True,'name':name,'tag':tag})
+                            user_data = {'enable':default_enable[name],'parent_row':dpg.last_container(),'name':name,'axis_tag':tag, 'axis_alias':'', 'hide_label':True,'hide_axis':False}
+                            dpg.add_button(label=name, width=100, callback=change_enable_theme, user_data=user_data)
                             dpg.bind_item_theme(dpg.last_item(), deactivated_axis)
-                            # print(dpg.get_item_label(button))
-                            show_rest_of_table(get_item_user_data(dpg.last_item()))
-                                # dpg.add_combo(axis_dropdowns, width=75, callback=set_axis_name)
-                                # dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_axis_alias, user_data=tag)
-                                # series_names = get_list_of_series_in_axis(tag)
-                                # if series_names:
-                                #     with dpg.tooltip(dpg.last_item()): # TODO: this tooltip is great but add a right cliclk menu to auto populate an input from selection. do not go back to combo input
-                                #         for name in series_names:
-                                #             dpg.add_text(name)
-                                # dpg.add_combo(list(axis_scale.keys()), width=50, callback=set_axis_scale, user_data=tag, default_value=get_current_axis_scale(tag))
-                                # # dpg.add_checkbox()
-                                # dpg.add_checkbox(indent=25)
-                                # dpg.add_checkbox(indent=25)
+                            dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_axis_alias, user_data=user_data, default_value=user_data['axis_alias'])
+                            series_names = get_list_of_series_in_axis(tag)
+                            if series_names:
+                                with dpg.tooltip(dpg.last_item()): # TODO: this tooltip is great but add a right cliclk menu to auto populate an input from selection. do not go back to combo input
+                                    for name in series_names:
+                                        dpg.add_text(name)
+                            dpg.add_combo(list(axis_scale.keys()), width=50, callback=set_axis_scale, user_data=user_data, default_value=get_current_axis_scale(tag))
+                            # dpg.add_checkbox()
+                            dpg.add_checkbox(indent=25, callback=hide_axis_label, default_value=user_data['hide_label'])
+                            dpg.add_checkbox(indent=25, callback=hide_axis, default_value=user_data['hide_axis'])
+
+                            hide_row(dpg.last_container(), False)
 
 
                 with dpg.group(horizontal=True):

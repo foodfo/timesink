@@ -101,6 +101,10 @@ def populate_algebra():
             dpg.add_text('Supported operations: \n PEMDAS \n sin, cos, tan \n ^, sqrt, pi \n e, ln, log10 \n max, min, abs')
         dpg.add_separator()
         dpg.add_input_text(tag='input', width=-1)
+        dpg.add_separator()
+        dpg.add_button(label='Save')
+        dpg.add_combo((), label='Recent Expressions')
+        dpg.add_combo((), label='Saved Expressions')
 def compute_algebra():
     if not ok_to_compute():
         return
