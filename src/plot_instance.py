@@ -5,7 +5,7 @@ import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 from dearpygui.dearpygui import mvPlotScale_Linear, mvPlotScale_Log10, mvPlotScale_SymLog, set_item_label, \
-    mvPlotScale_Time, get_item_user_data
+    mvPlotScale_Time, get_item_user_data, mvXAxis, mvYAxis, mvMouseButton_Right
 
 from src.data_instance import DataInstance
 from utils import plots, data
@@ -26,11 +26,13 @@ class PlotInstance:
         self.graph_tag = graph_tag
         self.legend_tag = legend_tag
         self.series_list: Dict[int, SeriesInstance] = {}
+        self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
         self.global_style: str = 'Line Plot'
         self.x_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid()] #, dpg.generate_uuid()] # can enable a 3rd x-axis possibly
         self.y_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid(), dpg.generate_uuid()]
         self.plot_name = None # gets init just after creation after getting index
-        self.options = self._init_options()
+        self.plot_options = self._init_plot_options()
+        self.axis_options = self._init_axis_options()
         self.plot_name_visible = False
 
     # TODO: decide if these shallow methods are better than direct access
@@ -42,13 +44,37 @@ class PlotInstance:
 
     # def set_global_style(self, style: str) -> None:
     #     self.global_style = style
+
+    def _init_axis_list(self):
+        default_axes = {'Y Axis 1': [dpg.mvYAxis, True,False], 'Y Axis 2': [dpg.mvYAxis2, True,True], 'Y Axis 3': [dpg.mvYAxis3, True,True], 'X Axis 1': [dpg.mvXAxis, True,False], 'X Axis 2': [dpg.mvXAxis2, True,True]} # TODO: tidy this up and consider making it a global config
+
+        axis_list = {}
+        for button_name, vars in default_axes.items():
+            instance_tag = dpg.generate_uuid()
+            visible = True
+            alias = ''
+            no_label = True
+            ax = AxisInstance(instance_tag=instance_tag, graph_tag=self.graph_tag, button_name=button_name, show=vars[1], which_axis=vars[0], alias=alias, no_label=no_label, location=vars[2])
+
+            axis_list[instance_tag] = ax
+        return axis_list
+
+
     def get_plot_name(self):
-        if self.options['show_plot_name']:
+        if self.plot_options['show_plot_name']:
             return self.plot_name
         else:
             return ''
 
-    def _init_options(self):
+    def _init_plot_options(self):
+        options = {
+            'show_plot_name':False,
+            'show_legend': True,
+            'highlight_axis_on_hover':False,
+        }
+        return options
+
+    def _init_axis_options(self):
         options = {
             'show_plot_name':False,
             'show_legend': True,
@@ -106,6 +132,79 @@ class PlotInstance:
 
         self.delete_line(sr_tag)
         self.draw_series(sr_tag, style, target_axis_tag)
+
+class AxisInstance:
+    def __init__(self, instance_tag, graph_tag, button_name, show, which_axis, alias, no_label, location):
+        self.instance_tag = instance_tag
+        self.graph_tag = graph_tag
+        self.button_name = button_name
+        self.show = show
+        self.which_axis = which_axis
+        self.alias = alias
+        self.no_label = no_label
+        self.location = location
+        self.series_list = {}
+        self.scale = 'Linear'
+        self.axis_scale_options = {'Linear':dpg.mvPlotScale_Linear, 'Log':dpg.mvPlotScale_Log10, 'Date':dpg.mvPlotScale_Time}
+
+
+    def hide_show_alias(self, app_data):
+        alias_shown = not app_data
+        dpg.configure_item(self.instance_tag, no_label=alias_shown)
+        # self.alias_shown = app_data
+        # alias = self.get_axis_alias()
+        # dpg.set_item_label(self.instance_tag, alias)
+
+
+
+    def set_axis_visibility(self, show):
+        self.show = show
+        if self.show:
+            dpg.configure_item(self.instance_tag,show=True)
+        else:
+            dpg.configure_item(self.instance_tag,show=False)
+
+    def set_axis_enable(self, enable):
+        if enable == False:
+            dpg.delete_item(self.instance_tag, children_only=True)
+            self.enabled = False
+            self.set_axis_visibility(False)
+        else:
+            self.enabled = True
+            self.set_axis_visibility(True)
+
+    def set_alias(self, alias): # shallow so we can use lambda callback
+        self.alias = alias
+        self.no_label = True
+        dpg.configure_item(self.instance_tag, label=alias, no_label=False) # auto show label on edit
+        print(self.instance_tag)
+
+    def set_scale(self, app_data):
+        self.scale = app_data
+        print(self.scale)
+        dpg.configure_item(self.instance_tag,scale=self.axis_scale_options[self.scale])
+
+    def hide_axis(self, sender):
+        print('HIDDEN PRESSED')
+        dpg.set_value(sender,False)
+        dpg.configure_item(self.instance_tag,show=False)
+
+    def disable_axis(self, sender):
+        print('HIDDEN PRESSED')
+        dpg.set_value(sender,False)
+        # dpg.configure_item(self.instance_tag,show=False)
+        dpg.delete_item(self.instance_tag, children_only=True)
+
+    # def get_current_axis_scale(tag):
+    #     if not dpg.does_item_exist(tag):
+    #         return None
+    #     current_scale = dpg.get_item_configuration(tag)['scale']
+    #     return next((label for label, scale in axis_scale.items() if scale == current_scale),
+    #                 None)  # reverse dictionary lookup
+    #
+    # def set_axis_scale(sender, app_data, user_data):
+    #     dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
+
 
 
 class SeriesInstance:
@@ -289,6 +388,18 @@ def delete_last_plot_instance(sender, app_data): #delete the last added plot ins
 #     rename_manager(sender, app_data, user_data)
 #     show_plot_options(sender, app_data)
 
+def add_plot_axes(pi):
+
+    for tag, ax in pi.axis_list.items(): # TODO: consider adding parent tag to ax so you dont have to pass thw whole pi in here
+        dpg.add_plot_axis(ax.which_axis, label=ax.alias, tag=ax.instance_tag, parent=ax.graph_tag,
+                          drop_callback=add_to_plot, user_data=pi.instance_tag, scale=ax.axis_scale_options[ax.scale], # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
+                          show=ax.show,
+                          no_label = ax.no_label,
+                          opposite=ax.location,
+                          no_side_switch=True,
+                          no_highlight=True)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+
+
 def add_axis(sender, app_data, user_data):
     pi = plots[user_data['instance_tag']]
     axis = user_data['axis']
@@ -365,14 +476,16 @@ def add_new_plot_instance():
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
     with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
-        dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
-        dpg.add_plot_axis(dpg.mvXAxis, label="x")
+        dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
+        # dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
         # print(dpg.last_container()) # TODO: figure out if y axis and x axis need thier own uuids as well then figure out how to access them
         # print(dpg.get_item_label(dpg.last_container()))
-
-        add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'x'})
-        add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'y'})
+        #
+        # add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'x'})
+        # add_axis(None,None,user_data={'instance_tag':pi.instance_tag,'axis':'y'})
+        #
+        add_plot_axes(pi)
 
     set_all_plot_heights()
 
@@ -407,17 +520,17 @@ def configure_plot(sender, app_data, user_data):
         set_item_label(pi.manager_tag, pi.plot_name)
 
     def set_plot_name_visibility(sender, app_data):
-        pi.options['show_plot_name'] = app_data
-        pi.plot_name_visible =  pi.options['show_plot_name']
+        pi.plot_options['show_plot_name'] = app_data
+        pi.plot_name_visible =  pi.plot_options['show_plot_name']
         set_item_label(pi.graph_tag, pi.get_plot_name())
 
     def show_legend_callback(sender, app_data):
-        pi.options['show_legend'] = app_data
-        dpg.configure_item(pi.legend_tag, show=pi.options['show_legend'])
+        pi.plot_options['show_legend'] = app_data
+        dpg.configure_item(pi.legend_tag, show=pi.plot_options['show_legend'])
 
     def highlight_axis_callback(sender, app_data): # TODO: consider making this global instead of local to each plot
-        pi.options['highlight_axis_on_hover'] = app_data
-        dpg.configure_item(pi.legend_tag, no_highlight_axis=not pi.options['highlight_axis_on_hover'])
+        pi.plot_options['highlight_axis_on_hover'] = app_data
+        dpg.configure_item(pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover'])
 
     def hide_row(tag, show):
         for idx, child in enumerate(dpg.get_item_children(tag)[1]):
@@ -455,28 +568,37 @@ def configure_plot(sender, app_data, user_data):
         print(style, sr_tag)
         pi.change_plot_style(sr_tag, style)
 
-    def get_list_of_series_in_axis(tag):
+    def get_list_of_series_in_axis(tag, ax): # TODO: this is currently broken
         series_list = [sr for sr in pi.series_list.values() if sr.parent_axis_tag == tag]
 
-        if tag in pi.y_axis_tags: # get x or y alias depending on source tag
+        # if tag in pi.y_axis_tags: # get x or y alias depending on source tag
+        print(dpg.get_item_info(tag))
+        print(ax.which_axis)
+        if ax.which_axis in (dpg.mvYAxis, dpg.mvYAxis2, dpg.mvYAxis3):
             names = [sr.y_alias for sr in series_list]
         else:
             names = [sr.x_alias for sr in series_list]
+        return names if names else []
 
-        if len(names) == 0:
-            return ()
-        return names
+    def axis_state_callback(sender,app_data, user_data):
+        pass
+        # ax: AxisInstance = user_data
+        #
+        # with dpg.popup(sender,mousebutton=dpg.mvMouseButton_Left):
+        #     dpg.add_text('hello world')
+        #     dpg.add_button(label='Hide')
+        #     dpg.add_button(label='Clear Contents')
 
-    axis_scale = {'Linear':mvPlotScale_Linear, 'Log':mvPlotScale_Log10, 'Date':mvPlotScale_Time}
-
-    def get_current_axis_scale(tag):
-        if not dpg.does_item_exist(tag):
-            return None
-        current_scale = dpg.get_item_configuration(tag)['scale']
-        return next((label for label, scale in axis_scale.items() if scale == current_scale), None) # reverse dictionary lookup
-
-    def set_axis_scale(sender, app_data, user_data):
-        dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
+    # axis_scale = {'Linear':mvPlotScale_Linear, 'Log':mvPlotScale_Log10, 'Date':mvPlotScale_Time}
+    #
+    # def get_current_axis_scale(tag):
+    #     if not dpg.does_item_exist(tag):
+    #         return None
+    #     current_scale = dpg.get_item_configuration(tag)['scale']
+    #     return next((label for label, scale in axis_scale.items() if scale == current_scale), None) # reverse dictionary lookup
+    #
+    # def set_axis_scale(sender, app_data, user_data):
+    #     dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
 
     def set_axis_alias(sender, app_data, user_data):
         user_data['axis_alias'] = app_data
@@ -517,6 +639,31 @@ def configure_plot(sender, app_data, user_data):
     #     dpg.add_checkbox(indent=25,show=enable)
     #     dpg.add_checkbox(indent=25,show=enable)
 
+    def hide_axis_callback(sender, app_data, user_data):
+        ax = user_data[0]
+        row_tag = user_data[1]
+        ax.hide_axis(sender)
+        hide_row(row_tag, False)
+
+    def disable_axis_callback(sender, app_data, user_data):
+        ax = user_data[0]
+        row_tag = user_data[1]
+        ax.disable_axis(sender)
+        ax.hide_axis(sender)
+        hide_row(row_tag, False)
+
+    def set_alias_callback(sender, app_data, user_data):
+        ax = user_data
+        ax.set_alias(app_data)
+
+    def set_scale_callback(sender, app_data, user_data):
+        ax = user_data
+        ax.set_scale(app_data)
+
+    def show_alias_callback(sender, app_data, user_data):
+        ax = user_data
+        ax.hide_show_alias(app_data)
+
 
 
     with dpg.window(label=f'Configure {pi.plot_name}',pos=(50,200), autosize=True): #,no_move=True,modal=True):
@@ -529,11 +676,11 @@ def configure_plot(sender, app_data, user_data):
                 dpg.add_separator(label='Plot')
                 with dpg.group(horizontal=True):
                     dpg.add_input_text(label='Plot Name', width=TEXT_BOX_WIDTH, default_value=pi.plot_name, callback=change_plot_name_callback)
-                    dpg.add_checkbox(label='Show Plot Name', default_value=pi.options['show_plot_name'], callback=set_plot_name_visibility)
+                    dpg.add_checkbox(label='Show Plot Name', default_value=pi.plot_options['show_plot_name'], callback=set_plot_name_visibility)
                 dpg.add_separator(label="Legend")
                 with dpg.group(horizontal=True):
-                    dpg.add_checkbox(label='Show legend', default_value=pi.options['show_legend'], callback=show_legend_callback)
-                    dpg.add_checkbox(label='Highlight Axis on Hover', default_value=pi.options['highlight_axis_on_hover'], callback=highlight_axis_callback)
+                    dpg.add_checkbox(label='Show legend', default_value=pi.plot_options['show_legend'], callback=show_legend_callback)
+                    dpg.add_checkbox(label='Highlight Axis on Hover', default_value=pi.plot_options['highlight_axis_on_hover'], callback=highlight_axis_callback)
                 # dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, width=TEXT_BOX_WIDTH) # TODO: see if theres a better way to do this now that everything is a class
                 dpg.add_separator(label='Axes')
 
@@ -543,29 +690,30 @@ def configure_plot(sender, app_data, user_data):
                     dpg.add_table_column(label='Axis Alias', width_fixed=True)
                     dpg.add_table_column(label='Scale', width_fixed=True)
                     # dpg.add_table_column(label='Invert',width_fixed=True,width=20) $ TODO: decide if this adds value or not
-                    dpg.add_table_column(label='Hide Label',width_fixed=True,width=20)
-                    dpg.add_table_column(label='Hide Axis',width_fixed=True,width=20)
+                    dpg.add_table_column(label='Show Label',width_fixed=True,width=20)
+                    # dpg.add_table_column(label='Show Axis',width_fixed=True,width=20)
 
-                    axis_list = {'Y Axis 1':pi.y_axis_tags[0],'Y Axis 2':pi.y_axis_tags[1],'Y Axis 3':pi.y_axis_tags[2],'X Axis 1':pi.x_axis_tags[0],'X Axis 2':pi.x_axis_tags[1]}
+                    # axis_list = {'Y Axis 1':pi.y_axis_tags[0],'Y Axis 2':pi.y_axis_tags[1],'Y Axis 3':pi.y_axis_tags[2],'X Axis 1':pi.x_axis_tags[0],'X Axis 2':pi.x_axis_tags[1]}
                     default_enable = {'Y Axis 1':True,'Y Axis 2':False,'Y Axis 3':False,'X Axis 1':True,'X Axis 2':False}
 
-                    for name, tag in axis_list.items():
+                    for tag, ax in pi.axis_list.items():
+                        # ax: AxisInstance
                         with dpg.table_row(user_data=tag):
-                            user_data = {'enable':default_enable[name],'parent_row':dpg.last_container(),'name':name,'axis_tag':tag, 'axis_alias':'', 'hide_label':True,'hide_axis':False}
-                            dpg.add_button(label=name, width=100, callback=change_enable_theme, user_data=user_data)
+                            row_tag = dpg.last_container()
+                            dpg.add_button(label=ax.button_name, width=100, user_data=ax)
+                            with dpg.popup(dpg.last_item(),no_move=True, mousebutton=dpg.mvMouseButton_Left, min_size=(55,45)):
+                                dpg.add_selectable(label='Hide', callback=hide_axis_callback, user_data=[ax,row_tag])
+                                dpg.add_selectable(label='Clear', callback=disable_axis_callback, user_data=[ax,row_tag])
                             dpg.bind_item_theme(dpg.last_item(), deactivated_axis)
-                            dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_axis_alias, user_data=user_data, default_value=user_data['axis_alias'])
-                            series_names = get_list_of_series_in_axis(tag)
+                            dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_alias_callback, user_data=ax, default_value=ax.alias)
+                            series_names = get_list_of_series_in_axis(tag, ax)
                             if series_names:
                                 with dpg.tooltip(dpg.last_item()): # TODO: this tooltip is great but add a right cliclk menu to auto populate an input from selection. do not go back to combo input
                                     for name in series_names:
                                         dpg.add_text(name)
-                            dpg.add_combo(list(axis_scale.keys()), width=50, callback=set_axis_scale, user_data=user_data, default_value=get_current_axis_scale(tag))
-                            # dpg.add_checkbox()
-                            dpg.add_checkbox(indent=25, callback=hide_axis_label, default_value=user_data['hide_label'])
-                            dpg.add_checkbox(indent=25, callback=hide_axis, default_value=user_data['hide_axis'])
-
-                            hide_row(dpg.last_container(), False)
+                            dpg.add_combo(list(ax.axis_scale_options.keys()), width=75, callback=set_scale_callback, user_data=ax, default_value=ax.scale)
+                            dpg.add_checkbox(indent=25, callback=show_alias_callback, user_data=ax, default_value=ax.no_label)
+                            print(tag)
 
 
                 with dpg.group(horizontal=True):

@@ -2,25 +2,16 @@ import dearpygui.dearpygui as dpg
 
 dpg.create_context()
 
+with dpg.window(label="Delete Files", modal=True, show=False, tag="modal_id", no_title_bar=True):
+    dpg.add_text("All those beautiful files will be deleted.\nThis operation cannot be undone!")
+    dpg.add_separator()
+    dpg.add_checkbox(label="Don't ask me next time")
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="OK", width=75, callback=lambda: dpg.configure_item("modal_id", show=False))
+        dpg.add_button(label="Cancel", width=75, callback=lambda: dpg.configure_item("modal_id", show=False))
+
 with dpg.window(label="Tutorial"):
-
-    with dpg.table(header_row=True, policy=dpg.mvTable_SizingFixedFit, row_background=True, reorderable=True,
-                   resizable=False, no_host_extendX=True, hideable=True,
-                   borders_innerV=True, delay_search=True, borders_outerV=True, borders_innerH=True,
-                   borders_outerH=True):
-
-        dpg.add_table_column(label="AAA", width_fixed=True)
-        dpg.add_table_column(label="BBB", width_fixed=True)
-        dpg.add_table_column(label="CCC", width_stretch=True, init_width_or_weight=10.0)
-        dpg.add_table_column(label="DDD", width_stretch=True, init_width_or_weight=0.0)
-
-        for i in range(0, 5):
-            with dpg.table_row():
-                for j in range(0, 4):
-                    if j == 2 or j == 3:
-                        dpg.add_text(f"Stretch {i},{j}")
-                    else:
-                        dpg.add_text(f"Fixed {i}, {j}")
+    dpg.add_button(label="Open Dialog", callback=lambda: dpg.configure_item("modal_id", show=True))
 
 dpg.create_viewport(title='Custom Title', width=800, height=600)
 dpg.setup_dearpygui()
