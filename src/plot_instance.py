@@ -28,7 +28,7 @@ class PlotInstance:
         self.legend_tag = legend_tag
         self.series_list: Dict[int, SeriesInstance] = {}
         self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
-        self.global_style: str = 'Line Plot'
+        self.global_style: str = 'Line'
         self.x_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid()] #, dpg.generate_uuid()] # can enable a 3rd x-axis possibly
         self.y_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid(), dpg.generate_uuid()]
         self.plot_name = None # gets init just after creation after getting index
@@ -104,23 +104,18 @@ class PlotInstance:
 
         legend = sr.y_alias
 
-        if style == 'Line Plot': # old: line # TODO: can i abstract away the text some how? maybe with enum>
+        if style == 'Line': # old: line # TODO: can i abstract away the text some how? maybe with enum>
             dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
-        elif style == 'Scatter Plot': # old scatter
+        elif style == 'Scatter': # old scatter
             dpg.add_scatter_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'Histogram':
             num_bins = sr.h_bins
             dpg.add_histogram_series(sr.y_vals, bins = sr.h_bins, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
-        elif style == 'area':
-            pass
-        elif style == 'bar':
-            pass
-        elif style == 'histogram':
-            sr.to_histogram()
-            dpg.add_scatter_series(sr.h_bins,sr.h_mags, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
-            pass
-        elif style == 'fft':
-            pass
+        # elif style == 'Area':
+        #     pass
+        # elif style == 'Segmented':
+        #     pass
+
 
     def delete_line(self, sr_tag):
         dpg.delete_item(self.series_list[sr_tag].mvseries_tag)
@@ -131,8 +126,15 @@ class PlotInstance:
         sr.style = style
         target_axis_tag = sr.parent_axis_tag # TODO: decide if parent or sender, check drawseries and callback root and clean up language
 
-        self.delete_line(sr_tag)
-        self.draw_series(sr_tag, style, target_axis_tag)
+        if style == 'Segmented':
+            dpg.configure_item(sr.mvseries_tag, segments=True)
+
+        if style == 'Area':
+            dpg.configure_item(sr.mvseries_tag, shaded=True)
+
+        if style == 'Scatter' or style == 'Line':
+            self.delete_line(sr_tag)
+            self.draw_series(sr_tag, style, target_axis_tag)
 
     def delete(self):
         dpg.delete_item(self.graph_tag)
@@ -309,7 +311,41 @@ def set_all_plot_heights():
 
 # ---------- Helper Functions ----------
 
-def add_to_plot(sender, app_data, user_data):
+def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data):
+    pi = plots[plot_instance_tag]
+    ds: DataInstance = data[data_instance_tag]
+    sr = SeriesInstance.create_object(ds, drag_data, pi.global_style, parent_axis_tag)
+    pi.add_series(sr.instance_tag, sr)  # TODO: once again, could direct access
+    pi.draw_series(sr.instance_tag, sr.style, sr.parent_axis_tag)
+
+    # autoscale axes if it's the first item added
+    if len(pi.series_list) == 1: # TODO: consider changing this to autosacle the first series added to any axis
+        for tag in pi.axis_list.keys():
+            dpg.fit_axis_data(tag)
+
+    # # This seems like it should work but it doesnt
+    # if len(dpg.get_item_children(parent_axis_tag, slot=1)) == 1:
+    #     dpg.fit_axis_data(parent_axis_tag)
+
+    # axes_tags = dpg.get_item_children(dpg.get_item_parent(sender),slot=1) # slot 1 holds axis information # TODO: figure out what to do if theres more than 2 axis
+    # for i in axes_tags:
+    #     dpg.fit_axis_data(i) # TODO: consider not doing this if there is already a series present
+    #                         # TODO: what happens if you only do one axis?
+def add_series_to_plot_from_plot(sender, app_data, user_data):
+
+    user_data = dpg.get_item_user_data(sender)
+    plot_instance_tag = user_data
+    pi = plots[plot_instance_tag]
+
+    # drag and drop to the plot will add to the first Y axis dpg.mvYAxis
+    parent_axis_tag = next(tag for tag, ax in pi.axis_list.items() if ax.which_axis is dpg.mvYAxis)
+    data_instance_tag = app_data['instance_tag']
+    drag_data = app_data
+
+    add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data)
+
+
+def add_series_to_plot_from_axis(sender, app_data, user_data):
 
     # add axis to current plot instance
     # 1. get data to add to PlotData
@@ -336,21 +372,22 @@ def add_to_plot(sender, app_data, user_data):
     # params = {k:v for k,v in extra_params.items() if v is not None}
     drag_data = app_data
 
+    add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data)
 
-    pi = plots[plot_instance_tag]
-    ds: DataInstance = data[data_instance_tag]
-
-    #2. Process Params for alternate inputs
-
-    # print(plots)
-
-    #3.
-    # sr = SeriesInstance(data_instance_tag, sr_instance_tag, parent_axis_tag, mvseries_tag, file_alias, x_name, x_alias, x_df, y_name, y_alias, y_df, style)
-    sr = SeriesInstance.create_object(ds, drag_data, pi.global_style, parent_axis_tag)
-    #4.
-    pi.add_series(sr.instance_tag, sr) # TODO: once again, could direct access
-    #5.
-    pi.draw_series(sr.instance_tag, sr.style, sr.parent_axis_tag)
+    # pi = plots[plot_instance_tag]
+    # ds: DataInstance = data[data_instance_tag]
+    #
+    # #2. Process Params for alternate inputs
+    #
+    # # print(plots)
+    #
+    # #3.
+    # # sr = SeriesInstance(data_instance_tag, sr_instance_tag, parent_axis_tag, mvseries_tag, file_alias, x_name, x_alias, x_df, y_name, y_alias, y_df, style)
+    # sr = SeriesInstance.create_object(ds, drag_data, pi.global_style, parent_axis_tag)
+    # #4.
+    # pi.add_series(sr.instance_tag, sr) # TODO: once again, could direct access
+    # #5.
+    # pi.draw_series(sr.instance_tag, sr.style, sr.parent_axis_tag)
 
 
 
@@ -371,6 +408,7 @@ def add_to_plot(sender, app_data, user_data):
     # for i in axes_tags:
     #     dpg.fit_axis_data(i) # TODO: consider not doing this if there is already a series present
     #                         # TODO: what happens if you only do one axis?
+
 
 
 def get_plot_instance_number(instance_tag):
@@ -402,7 +440,7 @@ def add_plot_axes(pi):
 
     for tag, ax in pi.axis_list.items(): # TODO: consider adding parent tag to ax so you dont have to pass thw whole pi in here
         dpg.add_plot_axis(ax.which_axis, label=ax.alias, tag=ax.instance_tag, parent=ax.graph_tag,
-                          drop_callback=add_to_plot, user_data=pi.instance_tag, scale=ax.axis_scale_options[ax.scale], # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
+                          drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=ax.axis_scale_options[ax.scale],  # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
                           show=ax.show,
                           no_label = ax.no_label,
                           opposite=ax.location,
@@ -438,7 +476,7 @@ def add_axis(sender, app_data, user_data):
     i = next((i for i,tag in enumerate(tags) if not dpg.does_item_exist(tag)), None) # todo: consider for loop instead of a generator link remove_last_axis
     if i is None:
         return
-    dpg.add_plot_axis(axis_constants[i], label=labels[i],tag=tags[i],opposite=position[i], parent = pi.graph_tag, drop_callback=add_to_plot,user_data=pi.instance_tag, scale=mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+    dpg.add_plot_axis(axis_constants[i], label=labels[i], tag=tags[i], opposite=position[i], parent = pi.graph_tag, drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
     # TODO: expose no-highlight in main options bar to change global behavior
 
 
@@ -485,7 +523,7 @@ def add_new_plot_instance():
     #     dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data) # TODO: see if theres a better way to do this now that everything is a class
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=add_series_to_plot_from_plot, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
         # dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -499,6 +537,7 @@ def add_new_plot_instance():
 
     set_all_plot_heights()
 
+    return pi.instance_tag # return the tag of the new plot instance in Plots in case you need it
 
 
 
@@ -510,7 +549,7 @@ def configure_plot(sender, app_data, user_data):
 
     # plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot') # TODO Rename plot_styles but this should move somewhere else
 
-    line_style = ('Line', 'Scatter', 'Segmented Line', 'Area Fill')
+    line_style = ('Line', 'Scatter', 'Segmented', 'Area')
 
     with dpg.theme() as activated_axis:
         with dpg.theme_component(dpg.mvButton):
@@ -590,9 +629,21 @@ def configure_plot(sender, app_data, user_data):
         set_all_plot_heights()
 
     def clear_plot():
-        pi.clear_contents()
+        # clear plot just deletes the old plot and manager, creates a new one, then slots it in the same location as the old one
+        manager_children = dpg.get_item_children(tags.plot_manager_tab)[1]
+        graph_children = dpg.get_item_children(tags.plot_window)[1]
+        manager_index = manager_children.index(pi.manager_tag)
+        graph_index = graph_children.index(pi.graph_tag)
+        before_manager_tag = manager_children[manager_index+1] if manager_index+1 < len(manager_children) else None
+        before_graph_tag = graph_children[graph_index+1] if graph_index+1 < len(graph_children) else None
+        pi.delete()
         dpg.delete_item(config_window_tag)
-
+        new_instance_tag = add_new_plot_instance()
+        if before_manager_tag is not None and before_graph_tag is not None:
+            new_manager_tag = plots[new_instance_tag].manager_tag
+            new_plot_tag = plots[new_instance_tag].graph_tag
+            dpg.move_item(new_manager_tag, before=before_manager_tag)
+            dpg.move_item(new_plot_tag, before=before_graph_tag)
 
 
 
@@ -755,7 +806,7 @@ def configure_plot(sender, app_data, user_data):
             dpg.show_item(ax.instance_tag)
 
 
-
+    # TODO: figure out how to enforce only one window per plot at a time. consider something similar to onewindow tag made earlier
     with dpg.window(label=f'Configure {pi.plot_name}',pos=(50,200), autosize=True): #,no_move=True,modal=True):
         config_window_tag = dpg.last_root()
 
@@ -781,20 +832,14 @@ def configure_plot(sender, app_data, user_data):
                     dpg.add_table_column(label='Scale', width_fixed=True)
                     dpg.add_table_column(label='Show Label',width_fixed=True,width=20)
 
-                    # axis_list = {'Y Axis 1':pi.y_axis_tagskk[0],'Y Axis 2':pi.y_axis_tags[1],'Y Axis 3':pi.y_axis_tags[2],'X Axis 1':pi.x_axis_tags[0],'X Axis 2':pi.x_axis_tags[1]}
-                    # default_enable = {'Y Axis 1':True,'Y Axis 2':False,'Y Axis 3':False,'X Axis 1':True,'X Axis 2':False}
-
                     # TODO: fix some wierdness in here: legend hide show randomly on hide show axis, axis alias overwrites show checkbox but doesnt change its state, tripe context menu is kind clunky, possible inefficient code checkign for first axis logic in multiple buttons, auto-list axes on hover doesnt work and should add a right click menu to select quickly - could be smart or dumb and just lists all axis
                     for tag, ax in pi.axis_list.items():
                         ax: AxisInstance
                         with dpg.table_row(user_data=tag):
                             row_tag = dpg.last_container()
-
                             btn = dpg.add_button(label=ax.button_name, callback=axis_state_callback, width=50, user_data=[ax, row_tag])
                             init_button_theme(ax, btn)
-
                             with dpg.popup(parent=dpg.last_item(), no_move=True, mousebutton=dpg.mvMouseButton_Left,min_size=(55, 45)):  # TODO: consider how best to declare this and weher to put it in the code stack
-                                print(dpg.last_item())
                                 if not is_first_axis(btn):
                                     dpg.add_selectable(label='Show', callback=show_axis_callback, user_data=[ax, row_tag, btn])
                                     dpg.add_selectable(label='Hide', callback=hide_axis_callback, user_data=[ax, row_tag, btn])
@@ -808,11 +853,30 @@ def configure_plot(sender, app_data, user_data):
                             dpg.add_combo(list(ax.axis_scale_options.keys()), width=75, callback=set_scale_callback, user_data=ax, default_value=ax.scale)
                             dpg.add_checkbox(indent=25, callback=show_alias_callback, user_data=ax, default_value=ax.no_label)
             with dpg.tab(label='Per Series'):
-                for tag, sr in pi.series_list.items():
-                    with dpg.group(horizontal=True):
-                        dpg.add_button(label=sr.y_alias, callback=edit_series_style_callback)
-                        dpg.add_combo(line_style, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
-                        dpg.add_text(f'Source X-Axis: {sr.x_alias}')
+
+                with dpg.table(header_row=False, borders_innerH=True, borders_outerH=True):
+                    dpg.add_table_column(label='Series', width_fixed=True) # TODO: maybe right click to rename?
+                    dpg.add_table_column(label='Line Type', width_fixed=True)
+                    dpg.add_table_column(label='Edit Style', width_fixed=True)
+                    dpg.add_table_column(label='Delete', width_fixed=True)
+
+                    # dpg.add_table_column(label='Show Label', width_fixed=True, width=20)
+
+                    for tag, sr in pi.series_list.items():
+                        with dpg.table_row():
+                            dpg.add_text(sr.y_alias)
+                            with dpg.tooltip(dpg.last_item()):
+                                dpg.add_text(sr.x_alias)
+                            dpg.add_combo(line_style, width=80,default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
+                            dpg.add_button(label='Edit',width=50)
+                            dpg.add_button(label='X',width=20)
+                            dpg.bind_item_theme(dpg.last_item(), delete_theme)
+
+                # for tag, sr in pi.series_list.items():
+                #     with dpg.group(horizontal=True):
+                #         dpg.add_button(label=sr.y_alias, callback=edit_series_style_callback)
+                #         dpg.add_combo(line_style, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
+                #         dpg.add_text(f'Source X-Axis: {sr.x_alias}')
 
         # dpg.add_separator()
         dpg.add_spacer(height=10)
