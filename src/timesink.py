@@ -316,7 +316,7 @@ add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exa
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
-# dpg.show_item_registry()
+dpg.show_item_registry()
 dpg.set_primary_window(tags.mainwin,True)
 dpg.start_dearpygui()
 dpg.destroy_context()
