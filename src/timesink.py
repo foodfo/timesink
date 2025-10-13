@@ -174,9 +174,11 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.plot_manager_tab):
                     # with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):
-                    with dpg.group(horizontal=True):
-                        dpg.add_button(label="- Plot", callback=delete_last_plot_instance)
-                        dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
+
+                    dpg.add_button(label="ADD PLOT", callback=add_new_plot_instance) # TODO: make add plot and add data centered on column
+                    # with dpg.group(horizontal=True):
+                    #     dpg.add_button(label="- Plot", callback=delete_last_plot_instance) # TODO: add right click button to quicklly delete plots and ddata
+                    #     dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
                     dpg.add_separator()
                 dpg.add_spacer(height=10)
             with dpg.collapsing_header(label='DATA', default_open=True):
@@ -316,7 +318,7 @@ add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exa
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
-dpg.show_item_registry()
+# dpg.show_item_registry()
 dpg.set_primary_window(tags.mainwin,True)
 dpg.start_dearpygui()
 dpg.destroy_context()

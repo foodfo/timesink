@@ -381,7 +381,7 @@ def configure_data(sender, app_data, user_data) -> None:
         delete_config_window()
         dpg.delete_item(ds.manager_tag) # delete manager
         data.pop(ds.instance_tag) # TODO: see if theres a better way than storing the data in UTILS
-
+    # TODO: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
 
     with dpg.theme() as red_text_theme:
         with dpg.theme_component(dpg.mvText):

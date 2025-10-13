@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from dearpygui.dearpygui import mvPlotScale_Linear, mvPlotScale_Log10, mvPlotScale_SymLog, set_item_label, \
     mvPlotScale_Time, get_item_user_data, mvXAxis, mvYAxis, mvMouseButton_Right
+from numpy.ma.core import resize
 
 from src.data_instance import DataInstance
 from utils import plots, data
@@ -132,6 +133,15 @@ class PlotInstance:
 
         self.delete_line(sr_tag)
         self.draw_series(sr_tag, style, target_axis_tag)
+
+    def delete(self):
+        dpg.delete_item(self.graph_tag)
+        dpg.delete_item(self.manager_tag)
+        plots.pop(self.instance_tag) # TODO: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
+
+    def clear_contents(self): # flush all contents from PI
+        dpg.delete_item(self.graph_tag, children_only=True)
+        # TODO: not fully implemented or tested. this probably leaves ghosts in the PlotInstance
 
 class AxisInstance:
     def __init__(self, instance_tag, graph_tag, button_name, show, which_axis, alias, no_label, location):
@@ -514,6 +524,14 @@ def configure_plot(sender, app_data, user_data):
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (10, 100, 100, 170))  # hover
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (10, 100, 100, 200))
 
+    with dpg.theme() as delete_theme:
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (180, 60, 60))  # neutral red
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (200, 80, 80))  # lighter red
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (160, 40, 40))  # darker red
+            # dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            # dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4)
+
     def change_plot_name_callback(sender, app_data):
         pi.plot_name = app_data
         set_item_label(pi.graph_tag, pi.get_plot_name())
@@ -565,6 +583,17 @@ def configure_plot(sender, app_data, user_data):
             dpg.bind_item_theme(button_tag, activated_axis)
         else:
             dpg.bind_item_theme(button_tag, deactivated_axis)
+
+    def delete_plot():
+        pi.delete()
+        dpg.delete_item(config_window_tag)
+        set_all_plot_heights()
+
+    def clear_plot():
+        pi.clear_contents()
+        dpg.delete_item(config_window_tag)
+
+
 
 
     def change_plot_style_callback(sender, app_data, user_data):
@@ -728,6 +757,7 @@ def configure_plot(sender, app_data, user_data):
 
 
     with dpg.window(label=f'Configure {pi.plot_name}',pos=(50,200), autosize=True): #,no_move=True,modal=True):
+        config_window_tag = dpg.last_root()
 
         TEXT_BOX_WIDTH = 125 # TODO: consider making this global
         CHECK_BOX_WIDTH = 50
@@ -764,23 +794,11 @@ def configure_plot(sender, app_data, user_data):
                             init_button_theme(ax, btn)
 
                             with dpg.popup(parent=dpg.last_item(), no_move=True, mousebutton=dpg.mvMouseButton_Left,min_size=(55, 45)):  # TODO: consider how best to declare this and weher to put it in the code stack
+                                print(dpg.last_item())
                                 if not is_first_axis(btn):
                                     dpg.add_selectable(label='Show', callback=show_axis_callback, user_data=[ax, row_tag, btn])
                                     dpg.add_selectable(label='Hide', callback=hide_axis_callback, user_data=[ax, row_tag, btn])
                                 dpg.add_selectable(label='Clear', callback=disable_axis_callback, user_data=[ax, row_tag, btn])
-
-
-                            # popup_tags = show_popup(btn)
-                            # dpg.set_item_user_data(btn,[ax, row_tag, *popup_tags])
-                            print(dpg.get_item_user_data(btn))
-
-                            # with dpg.popup(dpg.last_item(), no_move=True, mousebutton=dpg.mvMouseButton_Left, min_size=(55, 45), enable=False):  # TODO: consider how best to declare this and weher to put it in the code stack
-                            #     dpg.add_selectable(label='Hide', callback=hide_axis_callback)
-                            #     dpg.add_selectable(label='Clear', callback=disable_axis_callback)
-                            # with dpg.popup(dpg.last_item(),no_move=True, mousebutton=dpg.mvMouseButton_Left, min_size=(55,45)):
-                            #     dpg.add_selectable(label='Hide', callback=hide_axis_callback, user_data=[ax,row_tag])
-                            #     dpg.add_selectable(label='Clear', callback=disable_axis_callback, user_data=[ax,row_tag])
-                            # dpg.bind_item_theme(dpg.last_item(), deactivated_axis)
                             dpg.add_input_text(width=TEXT_BOX_WIDTH, callback=set_alias_callback, user_data=ax, default_value=ax.alias,auto_select_all=True)
                             series_names = get_list_of_series_in_axis(tag, ax)
                             if series_names:
@@ -789,14 +807,6 @@ def configure_plot(sender, app_data, user_data):
                                         dpg.add_text(name)
                             dpg.add_combo(list(ax.axis_scale_options.keys()), width=75, callback=set_scale_callback, user_data=ax, default_value=ax.scale)
                             dpg.add_checkbox(indent=25, callback=show_alias_callback, user_data=ax, default_value=ax.no_label)
-
-
-                with dpg.group(horizontal=True):
-                    dpg.add_button(label='+Y', callback=add_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
-                    dpg.add_button(label='-Y', callback=remove_last_axis, user_data={'instance_tag':pi.instance_tag,'axis':'y'})
-                with dpg.group(horizontal=True):
-                    dpg.add_button(label='+X', callback=add_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
-                    dpg.add_button(label='-X', callback=remove_last_axis,user_data={'instance_tag': pi.instance_tag, 'axis': 'x'})
             with dpg.tab(label='Per Series'):
                 for tag, sr in pi.series_list.items():
                     with dpg.group(horizontal=True):
@@ -804,11 +814,16 @@ def configure_plot(sender, app_data, user_data):
                         dpg.add_combo(line_style, default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
                         dpg.add_text(f'Source X-Axis: {sr.x_alias}')
 
+        # dpg.add_separator()
+        dpg.add_spacer(height=10)
         with dpg.group(horizontal=True):
-            dpg.add_button(label='Cancel')
-            dpg.add_button(label='OK')
-            dpg.add_spacer(width=170)
-            dpg.add_button(label='Delete Plot')
+            dpg.add_button(label='Cancel',callback=lambda: dpg.delete_item(config_window_tag))
+            dpg.add_button(label='OK',callback=lambda: dpg.delete_item(config_window_tag))
+            dpg.add_spacer(width=60)
+            dpg.add_button(label='Clear Plot', callback=clear_plot)
+            dpg.bind_item_theme(dpg.last_item(),activated_axis)
+            dpg.add_button(label='Delete Plot', callback=delete_plot)
+            dpg.bind_item_theme(dpg.last_item(),delete_theme)
 
 
 
