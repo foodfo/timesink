@@ -17,6 +17,7 @@ manipulate = None
 input_window = None
 data_window = None
 output_window = None
+draggables = None
 
 def init_tags():
     global source_config
@@ -34,6 +35,7 @@ def init_tags():
     global input_window
     global data_window
     global output_window
+    global draggables
 
     source_config = dpg.generate_uuid()
     mainwin = dpg.generate_uuid()
@@ -50,6 +52,7 @@ def init_tags():
     input_window = dpg.generate_uuid()
     data_window = dpg.generate_uuid()
     output_window = dpg.generate_uuid()
+    draggables = dpg.generate_uuid()
 
 def print_tags():
     print(source_config)

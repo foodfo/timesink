@@ -4,10 +4,6 @@ from tkinter import Label
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-from dearpygui.dearpygui import mvPlotScale_Linear, mvPlotScale_Log10, mvPlotScale_SymLog, set_item_label, \
-    mvPlotScale_Time, get_item_user_data, mvXAxis, mvYAxis, mvMouseButton_Right
-from numpy.ma.core import resize
-
 from src.data_instance import DataInstance
 from utils import plots, data
 from utils import * # TODO: temporary until I manage Globals better
@@ -476,7 +472,7 @@ def add_axis(sender, app_data, user_data):
     i = next((i for i,tag in enumerate(tags) if not dpg.does_item_exist(tag)), None) # todo: consider for loop instead of a generator link remove_last_axis
     if i is None:
         return
-    dpg.add_plot_axis(axis_constants[i], label=labels[i], tag=tags[i], opposite=position[i], parent = pi.graph_tag, drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+    dpg.add_plot_axis(axis_constants[i], label=labels[i], tag=tags[i], opposite=position[i], parent = pi.graph_tag, drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=dpg.mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
     # TODO: expose no-highlight in main options bar to change global behavior
 
 

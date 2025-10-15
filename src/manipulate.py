@@ -17,9 +17,11 @@ output_name = 'output_name' #TODO: make these tags clearer
 output_draggable = 'output_draggable'
 test='scalar'
 
+# TODO: see if you can auto-close on drag or drop. alternatively provide a close button for speed
 
 
-supported_manipulations = ('Scalar','Algebra','Calculus', 'Compare','Convert','Histogram','FFT','SRS')
+
+supported_manipulations = ('Scalar','Algebra','Calculus', 'Infinite Line','Compare','Convert','Histogram','FFT','SRS')
 
 
 def ok_to_compute(): # TODO: consider protecting this more by referencing the column in the parent dataframe to ensure no duplicate names

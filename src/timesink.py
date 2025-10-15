@@ -11,6 +11,7 @@ from utils import data, plots # TODO: see if theres a better way to store data a
 from utils import * # TODO: temporary until I manage Globals better
 import tags
 from manipulate import manipulation_options
+from draggables import draggable_options
 
 
 global showSide
@@ -160,6 +161,12 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                     dpg.add_button(label='Add Annotation')
 
         # with dpg.child_window(label="Options", autosize_x=True, auto_resize_y=True, border=False, always_use_window_padding=True):
+            with dpg.collapsing_header(label="Draggables", default_open=False):
+                dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
+                with dpg.child_window(auto_resize_y=True, tag=tags.draggables):
+                    draggable_options()
+
+
             with dpg.collapsing_header(label="Manipulations", default_open=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.manipulate):
