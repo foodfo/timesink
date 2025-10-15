@@ -161,13 +161,13 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                     dpg.add_button(label='Add Annotation')
 
         # with dpg.child_window(label="Options", autosize_x=True, auto_resize_y=True, border=False, always_use_window_padding=True):
-            with dpg.collapsing_header(label="Draggables", default_open=False):
+            with dpg.collapsing_header(label="Draggables", default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.draggables):
                     draggable_options()
 
 
-            with dpg.collapsing_header(label="Manipulations", default_open=False):
+            with dpg.collapsing_header(label="Manipulations", default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.manipulate):
                     manipulation_options()
@@ -177,7 +177,7 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
             #     with dpg.tab_bar():
             #         with dpg.tab(label='DATA', tag=tags.data_manager_tab):
 
-            with dpg.collapsing_header(label='PLOTS', default_open=True):
+            with dpg.collapsing_header(label='PLOTS', default_open=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag=tags.plot_manager_tab):
                     # with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):

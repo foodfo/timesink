@@ -4,11 +4,11 @@ from tkinter import Label
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-from src.data_instance import DataInstance
 from utils import plots, data
 from utils import * # TODO: temporary until I manage Globals better
 import tags
 from typing import Dict
+from draggables import add_annotation_to_plot, add_parse_line
 
 from dataclasses import dataclass
 
@@ -45,6 +45,8 @@ class PlotInstance:
     def _init_axis_list(self):
         # default_axes = {'Y Axis 1': [dpg.mvYAxis, True,False], 'Y Axis 2': [dpg.mvYAxis2, True,True], 'Y Axis 3': [dpg.mvYAxis3, True,True], 'X Axis 1': [dpg.mvXAxis, True,False], 'X Axis 2': [dpg.mvXAxis2, True,True]} # TODO: tidy this up and consider making it a global config
         default_axes = {'X1': [dpg.mvXAxis, True,False],'Y1': [dpg.mvYAxis, True,False],'Y2': [dpg.mvYAxis2, True,True], 'Y3': [dpg.mvYAxis3, False,True],  'X2': [dpg.mvXAxis2, False,False]} # TODO: tidy this up and consider making it a global config
+        # default_axes = {'X1': [dpg.mvXAxis, True,False],'Y1': [dpg.mvYAxis, True,False]}
+
 
         axis_list = {}
         for button_name, vars in default_axes.items():
@@ -327,6 +329,16 @@ def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data
     # for i in axes_tags:
     #     dpg.fit_axis_data(i) # TODO: consider not doing this if there is already a series present
     #                         # TODO: what happens if you only do one axis?
+
+def drop_item_on_plot_handler(sender, app_data, user_data):
+    if app_data.get('draggable')=='Annotation':
+        add_annotation_to_plot(sender, app_data, user_data)
+    if app_data.get('draggable')=='Parse Line':
+        add_parse_line(sender, app_data, user_data)
+    else:
+        add_series_to_plot_from_plot(sender, app_data, user_data)
+
+
 def add_series_to_plot_from_plot(sender, app_data, user_data):
 
     user_data = dpg.get_item_user_data(sender)
@@ -351,7 +363,6 @@ def add_series_to_plot_from_axis(sender, app_data, user_data):
     # 5. plot line with selected style
 
     # DEFAULT_HISTOGRAM_BINS = 10 # TODO: decide where this should go
-
     print(dpg.get_item_label(sender))
     # print(app_data)
     print(f'tag passed OUT from user_data: {user_data}')
@@ -359,6 +370,7 @@ def add_series_to_plot_from_axis(sender, app_data, user_data):
     user_data = dpg.get_item_user_data(sender)
     parent_axis_tag = sender
     print(f'RETRY USER DATA GET: {user_data}')
+    # TODO: have first added series to axis add its alias to the axis title by default. maybe make this a config optoni
 
     # 1.
     plot_instance_tag = user_data
@@ -435,6 +447,7 @@ def delete_last_plot_instance(sender, app_data): #delete the last added plot ins
 def add_plot_axes(pi):
 
     for tag, ax in pi.axis_list.items(): # TODO: consider adding parent tag to ax so you dont have to pass thw whole pi in here
+        # TODO: put a drop type str on plot axis to make sure you cant drop annotations
         dpg.add_plot_axis(ax.which_axis, label=ax.alias, tag=ax.instance_tag, parent=ax.graph_tag,
                           drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=ax.axis_scale_options[ax.scale],  # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
                           show=ax.show,
@@ -474,7 +487,7 @@ def add_axis(sender, app_data, user_data):
         return
     dpg.add_plot_axis(axis_constants[i], label=labels[i], tag=tags[i], opposite=position[i], parent = pi.graph_tag, drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=dpg.mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
     # TODO: expose no-highlight in main options bar to change global behavior
-
+    # TODO: put a drop type str on plot axis to make sure you cant drop annotations
 
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag,
         #                   tag=y1_tag)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -519,7 +532,7 @@ def add_new_plot_instance():
     #     dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data) # TODO: see if theres a better way to do this now that everything is a class
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=add_series_to_plot_from_plot, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=drop_item_on_plot_handler, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
         dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
         # dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -569,13 +582,13 @@ def configure_plot(sender, app_data, user_data):
 
     def change_plot_name_callback(sender, app_data):
         pi.plot_name = app_data
-        set_item_label(pi.graph_tag, pi.get_plot_name())
-        set_item_label(pi.manager_tag, pi.plot_name)
+        dpg.set_item_label(pi.graph_tag, pi.get_plot_name())
+        dpg.set_item_label(pi.manager_tag, pi.plot_name)
 
     def set_plot_name_visibility(sender, app_data):
         pi.plot_options['show_plot_name'] = app_data
         pi.plot_name_visible =  pi.plot_options['show_plot_name']
-        set_item_label(pi.graph_tag, pi.get_plot_name())
+        dpg.set_item_label(pi.graph_tag, pi.get_plot_name())
 
     def show_legend_callback(sender, app_data):
         pi.plot_options['show_legend'] = app_data

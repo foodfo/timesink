@@ -21,7 +21,7 @@ test='scalar'
 
 
 
-supported_manipulations = ('Scalar','Algebra','Calculus', 'Infinite Line','Compare','Convert','Histogram','FFT','SRS')
+supported_manipulations = ('Scalar','Algebra','Calculus','Aggregate','Filter', 'Infinite Line','Compare','Convert','Histogram','FFT','SRS')
 
 
 def ok_to_compute(): # TODO: consider protecting this more by referencing the column in the parent dataframe to ensure no duplicate names
@@ -51,7 +51,7 @@ def auto_populate_column_name(sender, app_data, user_data):
 
 def push_new_column(ds, out_name, out_alias):
     dpg.configure_item(output_draggable, label=out_alias, show=True)
-    dpg.add_drag_payload(label=ds.get_prepended_alias(out_alias), parent=output_draggable,drag_data=ds.get_drag_payload_data(out_name)) # TODO: consider making this output something that the ds object creates for consistency
+    dpg.add_drag_payload(label=ds.get_prepended_alias(out_alias), parent=output_draggable,drag_data=ds.get_drag_payload_data(out_name))
     create_data_manager_items(ds) # required to update ds manager appropriately
 
 
@@ -206,6 +206,40 @@ def compute_histogram():
 
     push_new_column(ds, out_name, out_alias)
 
+def populate_aggregate():
+    aggregate_options = ('Rolling Average', 'Rolling RMS')
+    dpg.add_button(label='Drag Column Here', drop_callback=auto_populate_column_name, parent=tags.input_window, user_data='rolling', tag='aggregate')
+    with dpg.group(horizontal=True, parent=tags.data_window):
+        dpg.add_combo(aggregate_options, tag='aggregate_type', width=150, default_value=aggregate_options[0])
+        dpg.add_spacer(width=10)
+        dpg.add_input_int(label='Window Size', width=50, tag='window', step_fast=0, step=0) # setting steps to 0 disables the buttons
+        # TODO: add a tooltip here descirbing window size
+
+def compute_aggregate():
+    if not ok_to_compute():
+        return
+    out_name = dpg.get_value(output_name)
+    app_data = dpg.get_item_user_data('aggregate') # TODO: clean up these variable names
+
+    instance_tag = app_data['instance_tag']
+    col_name = app_data['col_name']
+    extra_params = app_data['extra_params']
+    ds: DataInstance = data[instance_tag]
+
+    window = dpg.get_value('window')
+
+    aggregate_choice = dpg.get_value('aggregate_type')
+    if aggregate_choice == 'Rolling Average':
+        output_data = ds.df[col_name].rolling(window=window, center=True, min_periods=1).mean() # TODO: check this out and make sure this lets new df be lenght of old df. its too late right now
+    elif aggregate_choice == 'Rolling RMS':
+        output_data = ds.df[col_name].rolling(window=window, center=True, min_periods=1).apply(lambda x: np.sqrt(np.mean(x**2)), raw=True)
+    else:
+        raise NotImplementedError('Aggregate choice not implemented')
+
+    ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
+    out_alias = ds.get_alias_from_name(out_name)
+
+    push_new_column(ds, out_name, out_alias)
 
 
 
@@ -219,6 +253,8 @@ def populate_window_handler(which):
         populate_algebra()
     elif which == 'Histogram':
         populate_histogram()
+    elif which == 'Aggregate':
+        populate_aggregate()
     else:
         print('tripped')
         raise NotImplementedError
@@ -231,6 +267,8 @@ def compute_results_handler(sender, app_data, user_data):
         compute_algebra()
     elif which == 'Histogram':
         compute_histogram()
+    elif which == 'Aggregate':
+        compute_aggregate()
     else:
         print('tripped')
         raise NotImplementedError
