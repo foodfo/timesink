@@ -45,7 +45,6 @@ def add_annotation(sender, app_data, user_data):
 
     dpg.add_plot_annotation(label=text, default_value=plot_coords, parent=parent_tag, color=color, offset=offset, clamped=False)
     dpg.delete_item(dpg.last_root()) # TODO: thsi works but consider tag explicit to avoid accidentally deleting the wrong root
-
 def add_annotation_to_plot(sender, app_data, user_data):
     print(app_data['draggable'])
     user_data = dpg.get_item_user_data(sender)
