@@ -8,7 +8,7 @@ from utils import plots, data
 from utils import * # TODO: temporary until I manage Globals better
 import tags
 from typing import Dict
-from draggables import add_annotation_to_plot, add_parse_line
+from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
 
 from dataclasses import dataclass
 
@@ -24,6 +24,7 @@ class PlotInstance:
         self.legend_tag = legend_tag
         self.series_list: Dict[int, SeriesInstance] = {}
         self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
+        self.trim_list: Dict[int, TrimWindow] = {}
         self.global_style: str = 'Line'
         self.x_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid()] #, dpg.generate_uuid()] # can enable a 3rd x-axis possibly
         self.y_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid(), dpg.generate_uuid()]
@@ -333,8 +334,8 @@ def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data
 def drop_item_on_plot_handler(sender, app_data, user_data):
     if app_data.get('draggable')=='Annotation':
         add_annotation_to_plot(sender, app_data, user_data)
-    if app_data.get('draggable')=='Parse Line':
-        add_parse_line(sender, app_data, user_data)
+    elif app_data.get('draggable')=='Trim Window':
+        add_trim_window(sender, app_data, user_data)
     else:
         add_series_to_plot_from_plot(sender, app_data, user_data)
 

@@ -12,6 +12,7 @@ from utils import * # TODO: temporary until I manage Globals better
 import tags
 from manipulate import manipulation_options
 from draggables import draggable_options
+import export
 
 
 global showSide
@@ -102,6 +103,7 @@ with dpg.window(tag=tags.mainwin):
             dpg.add_menu_item(label="Truncate to View")
             dpg.add_menu_item(label="Truncate between parsers")
             dpg.add_menu_item(label="Truncate between every other parser")
+            dpg.add_menu_item(label='Export Trim Window', callback=export.open_trim_window_export)
         with dpg.menu(label="Help"):
             pass
     with dpg.tab_bar(label = "test", tag=tags.tabs):
@@ -155,10 +157,6 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                     dpg.add_checkbox(label='Unlock X-Axis')
                     dpg.add_checkbox(label='Bind cursor to screen')
                     dpg.add_checkbox(label='Bind cursor to axis')
-                    dpg.add_separator(label='draggables')
-                    dpg.add_button(label='Add Parse Line')
-                    dpg.add_button(label='Find Peak on Screen')
-                    dpg.add_button(label='Add Annotation')
 
         # with dpg.child_window(label="Options", autosize_x=True, auto_resize_y=True, border=False, always_use_window_padding=True):
             with dpg.collapsing_header(label="Draggables", default_open=True):
@@ -280,6 +278,8 @@ preprocessor_choices = ('None','WDH.py','WingTester.py','RainflowCounting.py')
 
 with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400, tag="file_dialog", callback=add_new_data_instance, default_path='/Users/tyler/Downloads'):
     dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
+    dpg.add_file_extension('.txt',color=(150, 150, 255, 255))
+
     # dpg.add_user_data(dpg.last_container)
 
     # with dpg.group():
@@ -319,8 +319,8 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)

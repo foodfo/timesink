@@ -193,7 +193,14 @@ class DataInstance:
 
     @staticmethod
     def _convert_to_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
-        df = pd.read_csv(file_path)
+
+        ext = Path(file_path).suffix
+
+        if ext == '.txt':
+            df = pd.read_csv(file_path, sep="\t")
+        else:
+            df = pd.read_csv(file_path)
+
         df.insert(0, '_index', df.index)
         return df
 
@@ -220,7 +227,7 @@ def create_data_manager_items(ds):
 
     with dpg.group(parent=ds.manager_tag):
         dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_text(f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}')
+        dpg.add_text(f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') # TODO: add a drop callback here that can set the X axis
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
@@ -283,7 +290,7 @@ def add_new_data_instance(sender, app_data, user_data):
 
     data[ds.instance_tag] = ds
 
-    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag): # TODO: plot_instance just uses tag.parent instead. consider that here
+    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag, ): # TODO: plot_instance just uses tag.parent instead. consider that here
         dpg.bind_item_theme(dpg.last_item(), other_theme)
         # dpg.bind_item_theme(dpg.last_item(), 0)
 
