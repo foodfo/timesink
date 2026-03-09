@@ -221,18 +221,33 @@ class DataInstance:
 def reverse_dict_mapping(dict):
     return({val: key for key, val in dict.items()})
 
+def quick_set_x_axis(sender, app_data, user_data):
+
+    ds = user_data
+    print(ds)
+    ds = dpg.get_item_user_data(sender)
+    print(ds)
+    data_instance_tag = app_data['instance_tag']
+    col_name = app_data['col_name']
+    print(col_name)
+    print(dpg.get_item_label(sender))
+    print(sender)
+    ds.set_source_x_axis(col_name) # TODO: should this display the name or the alias?
+    # dpg.configure_item(sender,default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') #TODO: need to regenerate configurator since it goes blank after drop callback
+    create_data_manager_items(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of refenerating the config window during callback creation so it doesnt open empty after changes like with the line above
+
 def create_data_manager_items(ds):
     if dpg.does_item_exist(ds.manager_tag):  # TODO: this feels like a really crude way to do this. consider something better
         dpg.delete_item(ds.manager_tag,children_only=True)
 
     with dpg.group(parent=ds.manager_tag):
         dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_text(f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') # TODO: add a drop callback here that can set the X axis
+        dpg.add_text(default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}', drop_callback=quick_set_x_axis, user_data=ds) # TODO: add a drop callback here that can set the X axis
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
         with dpg.child_window(height=130, resizable_y=True):
-            for name in ds.col_names:  # keys are aliasees, cols are df headers
+            for name in ds.col_names:  # keys are aliases, cols are df headers
                 alias = ds.get_alias_from_name(name)
                 dpg.add_button(label=alias)
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?

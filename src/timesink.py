@@ -1,3 +1,4 @@
+from asyncio import create_eager_task_factory
 
 import dearpygui.dearpygui as dpg
 import pandas as pd
@@ -19,10 +20,14 @@ global showSide
 showSide = False
 downsample_percent = 100
 
+#TODO: todo lists
+#FEATURE: new features to add to code
+#BUG: Known issue
+#REFACTOR: rework this chunk of code
 
-# region Feature Extraction
-test=5
-# endregion
+#region Feature Extraction
+    # test=5
+#endregion
 
 # data = {} # key = UUID tag, value = DataSource
 # plots = {} # key = UUID tag, value = PlotInstance
@@ -320,7 +325,8 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
         dpg.add_button(label="Cancel")
 
 # add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'}, tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'}, tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)

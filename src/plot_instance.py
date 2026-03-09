@@ -1,11 +1,12 @@
 from multiprocessing.process import parent_process
+from pyexpat import features
 from tkinter import Label
 
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
 from utils import plots, data
-from utils import * # TODO: temporary until I manage Globals better
+from utils import * # REFACTOR: temporary until I manage Globals better
 import tags
 from typing import Dict
 from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
@@ -33,7 +34,7 @@ class PlotInstance:
         self.axis_options = self._init_axis_options()
         self.plot_name_visible = False
 
-    # TODO: decide if these shallow methods are better than direct access
+    # REFACTOR: decide if these shallow methods are better than direct access
     # def set_graph_tag(self, tag):
     #     self.graph_tag = tag
     #
@@ -103,14 +104,14 @@ class PlotInstance:
 
         legend = sr.y_alias
 
-        if style == 'Line': # old: line # TODO: can i abstract away the text some how? maybe with enum>
+        if style == 'Line': # old: line # REFACTOR: can i abstract away the text some how? maybe with enum>
             dpg.add_line_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'Scatter': # old scatter
             dpg.add_scatter_series(sr.x_vals, sr.y_vals, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
         elif style == 'Histogram':
             num_bins = sr.h_bins
             dpg.add_histogram_series(sr.y_vals, bins = sr.h_bins, label=legend, parent=parent_axis_tag, tag=sr.mvseries_tag)
-        # elif style == 'Area':
+        # elif style == 'Area': #FEATURE: add this in later maybe
         #     pass
         # elif style == 'Segmented':
         #     pass
@@ -138,11 +139,11 @@ class PlotInstance:
     def delete(self):
         dpg.delete_item(self.graph_tag)
         dpg.delete_item(self.manager_tag)
-        plots.pop(self.instance_tag) # TODO: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
+        plots.pop(self.instance_tag) # REFACTOR: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
 
     def clear_contents(self): # flush all contents from PI
         dpg.delete_item(self.graph_tag, children_only=True)
-        # TODO: not fully implemented or tested. this probably leaves ghosts in the PlotInstance
+        # BUG: not fully implemented or tested. this probably leaves ghosts in the PlotInstance
 
 class AxisInstance:
     def __init__(self, instance_tag, graph_tag, button_name, show, which_axis, alias, no_label, location):
@@ -215,8 +216,6 @@ class AxisInstance:
     #
     # def set_axis_scale(sender, app_data, user_data):
     #     dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
-
-
 
 class SeriesInstance:
     def __init__(self,
@@ -338,6 +337,8 @@ def drop_item_on_plot_handler(sender, app_data, user_data):
         add_trim_window(sender, app_data, user_data)
     else:
         add_series_to_plot_from_plot(sender, app_data, user_data)
+
+    # TODO: instead of passing user_data genericly, consider passing: user_data=dpg.get_item_user_data(sender) to make it clearer we only care to pass the user data from the drop_callback - will need to change the logic in each function in the if statement
 
 
 def add_series_to_plot_from_plot(sender, app_data, user_data):
@@ -637,6 +638,12 @@ def configure_plot(sender, app_data, user_data):
         pi.delete()
         dpg.delete_item(config_window_tag)
         set_all_plot_heights()
+        # TODO: make this more robust. needs to check to see if a plot has been renamed first and skip if it has been. also needs to regenerate plot titles if those are visible
+        for tag,ps in plots.items(): # use PS instead of PI since pi.delete fails (likely due to collapsing scope of PI forcing it into function definition)
+            print(ps)
+            instance_number = get_plot_instance_number(ps.instance_tag)
+            ps.plot_name = f'Plot {instance_number}'
+            dpg.set_item_label(ps.manager_tag,ps.plot_name)
 
     def clear_plot():
         # clear plot just deletes the old plot and manager, creates a new one, then slots it in the same location as the old one
