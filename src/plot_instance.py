@@ -265,7 +265,7 @@ class SeriesInstance:
         col_name = drag_data['col_name']
         params = drag_data['extra_params']  # TODO: decide if/how to implement params. setting new x axis with FFT will cuase issues when we call get_prepended_alias. maybe guard this get fn to just pass any results not in the source
 
-        source_x_axis_name = params.get('alt_x_axis') or ds.source_x_axis_name
+        source_x_axis_name = params.get('alt_x_axis') or ds.x_axis_header
         style = params.get('axis_style') or global_style
         h_bins = params.get('histogram_bins') or 10
         fft_mag = params.get('FFT_magnitudes_arr')  or None

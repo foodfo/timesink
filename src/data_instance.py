@@ -1,24 +1,21 @@
 from pathlib import Path
-import numpy as np
 import pandas as pd
 import dearpygui.dearpygui as dpg
 from tags import Tags
 from utils import data
 from typing import Dict
 
-
-
 class DataInstance:
     def __init__(self, file_path: str, quick_format_options: Dict = None):
 
         self.file_name = Path(file_path).stem
-        self.file_alias = self.file_name # initialize the same
+        self.file_alias = self.file_name # initialize them the same
 
         self.instance_tag = Tags.generate()
         self.manager_tag = Tags.generate()
 
         self.df = self._load_dataframe(file_path, quick_format_options)
-        self.source_x_axis_name = self.df.columns[0]
+        self.x_axis_header = self.df.columns[0]
         self._header_to_alias: Dict[str,str] = {header: header for header in self.df.columns}
 
         self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
@@ -26,93 +23,60 @@ class DataInstance:
 
 
     @property
-    def col_names(self) -> tuple:
+    def col_headers(self) -> tuple:
         return tuple(self._header_to_alias.keys())
 
     @property
-    def col_alias(self) -> tuple:
+    def col_aliases(self) -> tuple:
         return tuple(self._header_to_alias.values())
 
-    @property
-    def _alias_to_header(self) -> Dict[str,str]:
-        return {alias: header for header, alias in self._header_to_alias.items()}
+    def get_alias_from_header(self, name) -> str:
+        return self._header_to_alias[name]
 
-
-    def get_alias_from_name(self, name):
-        return self.col_names_map[name]
-
-    def get_name_from_alias(self, alias):
-        return self.col_aliases_map[alias]
-
-    def get_column(self, name_or_alias):  # first index: column name, second index: data
-        if name_or_alias in self.col_names:
-            col_name = name_or_alias
-        elif name_or_alias in self.col_aliases:
-            col_name = self.get_name_from_alias(name_or_alias)
-        else:
-            return None # TODO decide if this is enough protection
-
-        return (col_name,self.get_alias_from_name(col_name),self.df[col_name]) # (name, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
-
-    def update_alias_list(self):
-        self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple -- THIS MAY be a geerator not a tuble right now. may need to cast to tupel
-
-    def set_file_alias(self,text):
-        if text == '' or None:
+    def set_file_alias(self, text) -> None:
+        if text == '' or text is None:
             self.file_alias = self.file_name
         else:
             self.file_alias = text
 
-        # if self._is_prepended_alias:
-        #     for alias in self.col_aliases:
-        #         self.prepend_file_alias(alias)
+    def get_column(self, header_or_alias) -> tuple|None:
+        if header_or_alias in self.col_headers:
+            header = header_or_alias
+        else:
+            header = next(h for h, a in self._header_to_alias.items() if a == header_or_alias)
 
-    def set_col_alias(self, name, alias): # set new column alias for column that already exists
-        # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
+        if header is None:
+            return None # TODO decide if this is enough protection
+
+        return (header, self.get_alias_from_header(header), self.df[header]) # (header, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
+
+    def set_col_alias(self, header, alias) -> None:
         if alias in self.col_aliases:
             raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
-            # return
+        if alias == '' or alias is None:
+            alias = header
+        self._header_to_alias[header] = alias
 
-        old_alias = self.get_alias_from_name(name)
-        if alias == '' or None:
-            self.col_aliases_map[name] = self.col_aliases_map.pop(old_alias)
-        else:
-            self.col_aliases_map[alias] = self.col_aliases_map.pop(old_alias)
+    def add_new_column(self, data: SeriesList, header, alias) -> None:
 
-        # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
-        self.update_alias_list()
-        self.col_names_map = reverse_dict_mapping(self.col_aliases_map)
-
-    def set_source_x_axis(self, col_name):
-        # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
-        self.source_x_axis_name = col_name
-
-    def add_new_column(self, data, col_name,col_alias):
-
-        if col_name in self.col_names:
+        if header in self.col_headers:
             raise ValueError('COLUMN NAME ALREADY PRESENT IN DATA')
 
-        if col_alias is None:
-            col_alias = col_name
+        if alias is None:
+            alias = header
 
+        self.df[header] = data
+        self._header_to_alias[header] = alias
+        self._init_extra_drag_payload_params(header) # TODO: make sure this is good. maybe rename it
 
-        self.df[col_name] = data
-        self.col_names_map[col_name] = col_alias
-
-        # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
-        self.col_aliases_map = reverse_dict_mapping((self.col_names_map))
-        self.update_alias_list()
-        self.col_names=tuple(self.df.columns)  # TODO: there MUST be a smoother way to update all of these items
-        self._init_extra_drag_payload_params(col_name)
-
-    def get_prepended_alias(self, alias):
+    def get_prepended_alias(self, alias):   # TODO: MOVE THIS TO PLOTMANAGER
         if self.is_prepended_alias:
             return self.file_alias + '_' + alias
         else:
             return alias
 
 
-
+    # TODO: work on extra drag payload params. make a dataclass
     def set_extra_drag_payload_params(self, col_name, user_params):
         self._extra_drag_payload_params[col_name] = user_params
 
@@ -131,7 +95,7 @@ class DataInstance:
 
         if col_name is None:
             all_params_dict = {}
-            for name in self.col_names:
+            for name in self.col_headers:
 
                 all_params_dict[name] = dict(params) # wrap in dict() to make a copy to pass values rather than a reference to params
             return all_params_dict
@@ -140,7 +104,7 @@ class DataInstance:
             return None
 
     @staticmethod
-    def _load_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
+    def _load_dataframe(file_path, quick_format_options) -> pd.DataFrame: # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
 
         ext = Path(file_path).suffix
 
@@ -395,7 +359,7 @@ def quick_set_x_axis(sender, app_data, user_data):
     print(col_name)
     print(dpg.get_item_label(sender))
     print(sender)
-    ds.set_source_x_axis(col_name) # TODO: should this display the name or the alias?
+    ds.x_axis_header = col_name # TODO: should this display the name or the alias?
     # dpg.configure_item(sender,default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') #TODO: need to regenerate configurator since it goes blank after drop callback
     create_data_manager_items(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of refenerating the config window during callback creation so it doesnt open empty after changes like with the line above
 
@@ -405,13 +369,13 @@ def create_data_manager_items(ds: DataInstance):
 
     with dpg.group(parent=ds.manager_tag):
         dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_button(label=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}', drop_callback=quick_set_x_axis, user_data=ds)
+        dpg.add_button(label=f'X-Axis: {ds.get_alias_from_header(ds.x_axis_header)}', drop_callback=quick_set_x_axis, user_data=ds)
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
         with dpg.child_window(height=130, resizable_y=True):
-            for name in ds.col_names:  # keys are aliases, cols are df headers
-                alias = ds.get_alias_from_name(name)
+            for name in ds.col_headers:  # keys are aliases, cols are df headers
+                alias = ds.get_alias_from_header(name)
                 dpg.add_button(label=alias)
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
                                       drag_data=ds.get_drag_payload_data(name),
@@ -513,8 +477,8 @@ def configure_data(sender, app_data, user_data) -> None:
             dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
 
         if x_axis_choice in stored_choices:
-            if ds.source_x_axis_name != dpg.get_value(x_axis_choice): # skip if its the same text
-                ds.set_source_x_axis(dpg.get_value(x_axis_choice)) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
+            if ds.x_axis_header != dpg.get_value(x_axis_choice): # skip if its the same text
+                ds.x_axis_header(dpg.get_value(x_axis_choice)) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
 
         if prepend_alias_choice in stored_choices:
             if dpg.get_value(prepend_alias_choice):
@@ -541,8 +505,8 @@ def configure_data(sender, app_data, user_data) -> None:
         dpg.delete_item(Tags.source_config)
 
         print(ds.file_alias)
-        print(ds.source_x_axis_name)
-        print(ds.col_aliases_map)
+        print(ds.x_axis_header)
+        print(ds.col_aliases)
 
     def delete_config_window():
         dpg.delete_item(Tags.source_config)
@@ -579,7 +543,7 @@ def configure_data(sender, app_data, user_data) -> None:
                 dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            x_axis_choice = dpg.add_combo(ds.col_names, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.source_x_axis_name, callback=store_choices_callback) # choices are names, not aliases. this will return a name and it must be converted back to an alias
+            x_axis_choice = dpg.add_combo(ds.col_headers, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.x_axis_header, callback=store_choices_callback) # choices are names, not aliases. this will return a name and it must be converted back to an alias
             dpg.add_spacer(width=25)
             datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
         with dpg.group(horizontal=True):
@@ -588,8 +552,8 @@ def configure_data(sender, app_data, user_data) -> None:
             scalar_choice = dpg.add_input_float(step=0, step_fast=0, width=50,  format="%.1f", callback=store_choices_callback)
         dpg.add_separator(label='Rename Columns')
         with dpg.child_window(height=COLUMN_RENAME_HEIGHT, border=False, auto_resize_x=True):
-            for name in ds.col_names:
-                alias = ds.get_alias_from_name(name)
+            for name in ds.col_headers:
+                alias = ds.get_alias_from_header(name)
                 dpg.add_input_text(label=name, default_value=alias, width=TEXT_BOX_WIDTH, no_spaces=True, auto_select_all=True, callback=renamed_columns_callback)
             # with dpg.tab(label='Edit X-Axis'):
             #     dpg.add_listbox(("AAAA", "BBBB", "CCCC", "DDDD"), label='ALTERNATE X-AXIS SOURCE')

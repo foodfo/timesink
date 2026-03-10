@@ -35,7 +35,7 @@ def rebuild_input_button(sender, app_data, user_data):
     instance_tag = app_data['instance_tag']
     col_name = app_data['col_name']
     ds: DataInstance = data[instance_tag]
-    col_alias = ds.get_alias_from_name(col_name)
+    col_alias = ds.get_alias_from_header(col_name)
 
     dpg.configure_item(sender, label=col_alias, user_data=app_data,drop_callback=rebuild_input_button)
     # dpg.add_button(label=col_alias, user_data=app_data, tag=button_tag, drop_callback=rebuild_input_button, parent=Tags.input_window)
@@ -79,7 +79,7 @@ def compute_scalar():
     output_data = ds.df[col_name] * scalar
 
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
-    out_alias = ds.get_alias_from_name(out_name)
+    out_alias = ds.get_alias_from_header(out_name)
 
     push_new_column(ds, out_name, out_alias)
 
@@ -173,7 +173,7 @@ def compute_algebra():
     ds = data[dpg.get_item_user_data('x')['instance_tag']]
 
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
-    out_alias = ds.get_alias_from_name(out_name)
+    out_alias = ds.get_alias_from_header(out_name)
 
     push_new_column(ds, out_name, out_alias)
 
@@ -200,7 +200,7 @@ def compute_histogram():
     output_data = ds.df[col_name]
 
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
-    out_alias = ds.get_alias_from_name(out_name)
+    out_alias = ds.get_alias_from_header(out_name)
 
     ds.set_extra_drag_payload_params(out_name,{'histogram_bins':n_bins,'axis_style':'Histogram'})
 
@@ -237,7 +237,7 @@ def compute_aggregate():
         raise NotImplementedError('Aggregate choice not implemented')
 
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
-    out_alias = ds.get_alias_from_name(out_name)
+    out_alias = ds.get_alias_from_header(out_name)
 
     push_new_column(ds, out_name, out_alias)
 
