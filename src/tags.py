@@ -1,68 +1,26 @@
 import dearpygui.dearpygui as dpg
 
+class Tags:
 
-# TODO: audit this list to make sure it has the minimum required tags for best encapsulation
-source_config = None
-mainwin = None
-primary_tab = None
-tabs = None
-sidebar = None
-options_window = None
-managers_window = None
-data_manager_tab = None
-plot_manager_tab = None
-plot_window = None
-import_config = None
-manipulate = None
-input_window = None
-data_window = None
-output_window = None
-draggables = None
+    @staticmethod
+    def generate() -> int:
+        return dpg.generate_uuid()
 
-def init_tags():
-    global source_config
-    global mainwin
-    global primary_tab
-    global tabs
-    global sidebar
-    global options_window
-    global managers_window
-    global data_manager_tab
-    global plot_manager_tab
-    global plot_window
-    global import_config
-    global manipulate
-    global input_window
-    global data_window
-    global output_window
-    global draggables
-
-    source_config = dpg.generate_uuid()
-    mainwin = dpg.generate_uuid()
-    primary_tab = dpg.generate_uuid()
-    tabs = dpg.generate_uuid()
-    sidebar = dpg.generate_uuid()
-    options_window = dpg.generate_uuid()
-    managers_window = dpg.generate_uuid()
-    data_manager_tab = dpg.generate_uuid()
-    plot_manager_tab = dpg.generate_uuid()
-    plot_window = dpg.generate_uuid()
-    import_config = dpg.generate_uuid()
-    manipulate = dpg.generate_uuid()
-    input_window = dpg.generate_uuid()
-    data_window = dpg.generate_uuid()
-    output_window = dpg.generate_uuid()
-    draggables = dpg.generate_uuid()
-
-def print_tags():
-    print(source_config)
-    print(mainwin)
-    print(primary_tab)
-    print(tabs)
-    print(sidebar)
-    print(options_window)
-    print(managers_window)
-    print(data_manager_tab)
-    print(plot_manager_tab)
-    print(plot_window)
-    print(import_config)
+    @staticmethod
+    def init_tags() -> None:
+        Tags.source_config = Tags.generate()
+        Tags.mainwin = Tags.generate()
+        Tags.primary_tab = Tags.generate()
+        Tags.tabs = Tags.generate()
+        Tags.sidebar = Tags.generate()
+        Tags.options_window = Tags.generate()
+        Tags.managers_window = Tags.generate()
+        Tags.data_manager_tab = Tags.generate()
+        Tags.plot_manager_tab = Tags.generate()
+        Tags.plot_window = Tags.generate()
+        Tags.import_config = Tags.generate()
+        Tags.manipulate = Tags.generate()
+        Tags.input_window = Tags.generate()
+        Tags.data_window = Tags.generate()
+        Tags.output_window = Tags.generate()
+        Tags.draggables = Tags.generate()

@@ -5,7 +5,7 @@ from dearpygui.dearpygui import show_item, drag_payload
 
 from data_instance import create_data_manager_items # todo: consider not importing this and access it thru dot operator instead
 
-import tags
+from tags import Tags
 from data_instance import DataInstance
 from utils import data
 
@@ -13,7 +13,7 @@ INPUT_WINDOW_WIDTH = 150
 DATA_WINDOW_WIDTH = 350
 
 one_window_only='onewindow'
-output_name = 'output_name' #TODO: make these tags clearer
+output_name = 'output_name' #TODO: make these Tags clearer
 output_draggable = 'output_draggable'
 test='scalar'
 
@@ -38,7 +38,7 @@ def rebuild_input_button(sender, app_data, user_data):
     col_alias = ds.get_alias_from_name(col_name)
 
     dpg.configure_item(sender, label=col_alias, user_data=app_data,drop_callback=rebuild_input_button)
-    # dpg.add_button(label=col_alias, user_data=app_data, tag=button_tag, drop_callback=rebuild_input_button, parent=tags.input_window)
+    # dpg.add_button(label=col_alias, user_data=app_data, tag=button_tag, drop_callback=rebuild_input_button, parent=Tags.input_window)
 
 def auto_populate_column_name(sender, app_data, user_data):
     col_name = app_data['col_name']
@@ -56,8 +56,8 @@ def push_new_column(ds, out_name, out_alias):
 
 
 def populate_scalar():
-    dpg.add_button(label='Drag Column Here', drop_callback=rebuild_input_button, parent=tags.input_window, user_data={}, tag='scalar')
-    dpg.add_input_float(label='Scalar', parent=tags.data_window, tag='input', width=150) # TODO: make width a variable
+    dpg.add_button(label='Drag Column Here', drop_callback=rebuild_input_button, parent=Tags.input_window, user_data={}, tag='scalar')
+    dpg.add_input_float(label='Scalar', parent=Tags.data_window, tag='input', width=150) # TODO: make width a variable
 def compute_scalar():
 
     if not ok_to_compute():
@@ -85,17 +85,17 @@ def compute_scalar():
 
 
 def populate_algebra():
-    with dpg.group(horizontal=True,parent=tags.input_window):
+    with dpg.group(horizontal=True, parent=Tags.input_window):
         dpg.add_text('X: ')
         dpg.add_button(label='Drag X Val', drop_callback=rebuild_input_button, user_data={}, tag='x')
-    with dpg.group(horizontal=True,parent=tags.input_window):
+    with dpg.group(horizontal=True, parent=Tags.input_window):
         dpg.add_text('Y: ')
         dpg.add_button(label='Drag Y Val', drop_callback=rebuild_input_button, user_data={}, tag='y')
-    with dpg.group(horizontal=True,parent=tags.input_window):
+    with dpg.group(horizontal=True, parent=Tags.input_window):
         dpg.add_text('Z: ')
         dpg.add_button(label='Drag Z Val', drop_callback=rebuild_input_button, user_data={}, tag='z')
 
-    with dpg.group(parent=tags.data_window):
+    with dpg.group(parent=Tags.data_window):
         dpg.add_text('Algebraic Expression:')
         with dpg.tooltip(dpg.last_item()):
             dpg.add_text('X, Y, and Z will be mapped to selected columns')
@@ -180,8 +180,8 @@ def compute_algebra():
 
 
 def populate_histogram():
-    dpg.add_button(label='Drag Column Here', drop_callback=auto_populate_column_name, parent=tags.input_window, user_data='histogram', tag='hist')
-    dpg.add_input_int(label='Number of Bins for Histogram', parent=tags.data_window, width=75, tag='input', default_value=10)
+    dpg.add_button(label='Drag Column Here', drop_callback=auto_populate_column_name, parent=Tags.input_window, user_data='histogram', tag='hist')
+    dpg.add_input_int(label='Number of Bins for Histogram', parent=Tags.data_window, width=75, tag='input', default_value=10)
 def compute_histogram():
     if not ok_to_compute():
         return
@@ -208,8 +208,8 @@ def compute_histogram():
 
 def populate_aggregate():
     aggregate_options = ('Rolling Average', 'Rolling RMS')
-    dpg.add_button(label='Drag Column Here', drop_callback=auto_populate_column_name, parent=tags.input_window, user_data='rolling', tag='aggregate')
-    with dpg.group(horizontal=True, parent=tags.data_window):
+    dpg.add_button(label='Drag Column Here', drop_callback=auto_populate_column_name, parent=Tags.input_window, user_data='rolling', tag='aggregate')
+    with dpg.group(horizontal=True, parent=Tags.data_window):
         dpg.add_combo(aggregate_options, tag='aggregate_type', width=150, default_value=aggregate_options[0])
         dpg.add_spacer(width=10)
         dpg.add_input_int(label='Window Size', width=50, tag='window', step_fast=0, step=0) # setting steps to 0 disables the buttons
@@ -282,11 +282,11 @@ def open_manipulate_window(sender, app_data, user_data):
     window_name = which_manipulation
     with dpg.window(label=window_name, autosize=True, pos=(100, 100), tag=one_window_only):
         with dpg.group(horizontal=True):
-            with dpg.child_window(width=INPUT_WINDOW_WIDTH, autosize_y=True, tag=tags.input_window):
+            with dpg.child_window(width=INPUT_WINDOW_WIDTH, autosize_y=True, tag=Tags.input_window):
                 dpg.add_text('INPUTS')
                 dpg.add_separator()
             with dpg.child_window(width=DATA_WINDOW_WIDTH, auto_resize_y=True, border=False):
-                with dpg.child_window(auto_resize_y=True,width=DATA_WINDOW_WIDTH , tag=tags.data_window):
+                with dpg.child_window(auto_resize_y=True, width=DATA_WINDOW_WIDTH , tag=Tags.data_window):
                     pass
                 with dpg.child_window(width=DATA_WINDOW_WIDTH, auto_resize_y=True):
                     with dpg.group(horizontal=True):
@@ -295,7 +295,7 @@ def open_manipulate_window(sender, app_data, user_data):
                             dpg.add_input_text(width=150,tag=output_name, no_spaces=True, auto_select_all=True)  # TODO: width should probably be a variable
                         dpg.add_spacer(width=35)
                         dpg.add_button(label='GENERATE', width=100, height=40, callback=compute_results_handler, user_data=which_manipulation)
-            with dpg.child_window(width=INPUT_WINDOW_WIDTH, autosize_y=True, tag=tags.output_window):
+            with dpg.child_window(width=INPUT_WINDOW_WIDTH, autosize_y=True, tag=Tags.output_window):
                 dpg.add_text('OUTPUTS')
                 dpg.add_separator()
                 dpg.add_button(label=window_name, show=False, tag=output_draggable)
@@ -303,7 +303,7 @@ def open_manipulate_window(sender, app_data, user_data):
     populate_window_handler(which_manipulation)
 
 def manipulation_options():
-    with dpg.group(parent = tags.manipulate):
+    with dpg.group(parent = Tags.manipulate):
         for option in supported_manipulations:
             dpg.add_button(label=option, width=-1, callback=open_manipulate_window) #TODO: implement quick drag functions which auto load selected series on drop_callback
 

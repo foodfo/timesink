@@ -10,7 +10,7 @@ from data_instance import DataInstance, add_new_data_instance
 from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_instance, set_all_plot_heights
 from utils import data, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 from utils import * # TODO: temporary until I manage Globals better
-import tags
+from tags import Tags
 from manipulate import manipulation_options
 from draggables import draggable_options
 import export
@@ -52,8 +52,8 @@ dpg.setup_dearpygui()
 dpg.show_viewport()
 # dpg.show_debug()
 
-tags.init_tags()
-# tags.print_tags()
+Tags.init_tags()
+# Tags.print_tags()
 
 
 # ---------- Helper Functions ----------
@@ -73,7 +73,7 @@ def hide_sidebar():
 
 
 def show_source_config():
-    dpg.configure_item(tags.source_config,show=True)
+    dpg.configure_item(Tags.source_config, show=True)
 
 
 
@@ -89,14 +89,14 @@ def set_x_axis(sender, app_data, user_data):
 
 def show_file_dialog(sender, app_data, user_data):
     # dpg.show_item("file_dialog")
-    dpg.configure_item(item='file_dialog',user_data=user_data,show=True) #TODO: consider moving tags into utils so they can be referenced globally rather than being passed through as user data
+    dpg.configure_item(item='file_dialog',user_data=user_data,show=True) #TODO: consider moving Tags into utils so they can be referenced globally rather than being passed through as user data
 
 
 
 
 
 # main window with menu bar and tab instance containers
-with dpg.window(tag=tags.mainwin):
+with dpg.window(tag=Tags.mainwin):
     with dpg.menu_bar(show=False):
         with dpg.menu(label="File",): # not sure what to put here
             pass
@@ -111,9 +111,9 @@ with dpg.window(tag=tags.mainwin):
             dpg.add_menu_item(label='Export Trim Window', callback=export.open_trim_window_export)
         with dpg.menu(label="Help"):
             pass
-    with dpg.tab_bar(label = "test", tag=tags.tabs):
+    with dpg.tab_bar(label = "test", tag=Tags.tabs):
         dpg.add_tab_button(label="<<", tag="hide_sidebar",callback=hide_sidebar)
-        with dpg.tab(label="Tab 1", tag=tags.primary_tab):
+        with dpg.tab(label="Tab 1", tag=Tags.primary_tab):
             pass
         with dpg.tab(label="Tab 2"):
             pass
@@ -150,10 +150,10 @@ with dpg.theme() as blue_header_theme: # TEAL THEME
 
 
 # everything that sits in a single tab instance
-with dpg.child_window(parent=tags.primary_tab, border=False):
+with dpg.child_window(parent=Tags.primary_tab, border=False):
     with dpg.group(horizontal=True):
-            # with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=tags.options_window):
-        with dpg.child_window(resizable_x=True, width=SIDEBAR_WIDTH, border=False, tag=tags.sidebar):
+            # with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=Tags.options_window):
+        with dpg.child_window(resizable_x=True, width=SIDEBAR_WIDTH, border=False, tag=Tags.sidebar):
             with dpg.collapsing_header(label="Options",default_open=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True):
@@ -166,24 +166,24 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
         # with dpg.child_window(label="Options", autosize_x=True, auto_resize_y=True, border=False, always_use_window_padding=True):
             with dpg.collapsing_header(label="Draggables", default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
-                with dpg.child_window(auto_resize_y=True, tag=tags.draggables):
+                with dpg.child_window(auto_resize_y=True, tag=Tags.draggables):
                     draggable_options()
 
 
             with dpg.collapsing_header(label="Manipulations", default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
-                with dpg.child_window(auto_resize_y=True, tag=tags.manipulate):
+                with dpg.child_window(auto_resize_y=True, tag=Tags.manipulate):
                     manipulation_options()
 
 
-            # with dpg.child_window(label="managers",autosize_x=True, autosize_y=True, tag=tags.managers_window):
+            # with dpg.child_window(label="managers",autosize_x=True, autosize_y=True, tag=Tags.managers_window):
             #     with dpg.tab_bar():
-            #         with dpg.tab(label='DATA', tag=tags.data_manager_tab):
+            #         with dpg.tab(label='DATA', tag=Tags.data_manager_tab):
 
             with dpg.collapsing_header(label='PLOTS', default_open=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
-                with dpg.child_window(auto_resize_y=True, tag=tags.plot_manager_tab):
-                    # with dpg.tab(label='PLOTS', tag=tags.plot_manager_tab):
+                with dpg.child_window(auto_resize_y=True, tag=Tags.plot_manager_tab):
+                    # with dpg.tab(label='PLOTS', tag=Tags.plot_manager_tab):
 
                     dpg.add_button(label="ADD PLOT", callback=add_new_plot_instance) # TODO: make add plot and add data centered on column
                     # with dpg.group(horizontal=True):
@@ -193,17 +193,17 @@ with dpg.child_window(parent=tags.primary_tab, border=False):
                 dpg.add_spacer(height=10)
             with dpg.collapsing_header(label='DATA', default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
-                with dpg.child_window(auto_resize_y=True,tag = tags.data_manager_tab):
+                with dpg.child_window(auto_resize_y=True, tag = Tags.data_manager_tab):
                     # dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog"), user_data=dpg.last_item())
                     dpg.add_button(label="ADD DATA", callback=show_file_dialog, user_data=dpg.last_container())
                     dpg.add_separator()
                     dpg.add_spacer(height=10)
-                    with dpg.group(tag = tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
-                        # dpg.bind_item_theme(tags.data_manager_tab, neutral_theme)
+                    with dpg.group(tag = Tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
+                        # dpg.bind_item_theme(Tags.data_manager_tab, neutral_theme)
                         pass
 
             # this is the actual plot area
-        with dpg.child_window(autosize_x=True, autosize_y=True, border=False, tag=tags.plot_window):
+        with dpg.child_window(autosize_x=True, autosize_y=True, border=False, tag=Tags.plot_window):
             for i in range(NUM_PLOTS_ON_STARTUP):
                 add_new_plot_instance()
                 # add_new_plot_instance()
@@ -297,7 +297,7 @@ with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400
     #     dpg.add_checkbox(label='Launch Import Configurator', callback = lambda: dpg.show_item(import_config))
 
 
-with dpg.window(label='Import Configurator',width=500, height=700, modal=True, show=False, tag=tags.import_config):
+with dpg.window(label='Import Configurator', width=500, height=700, modal=True, show=False, tag=Tags.import_config):
     dpg.add_input_int(label='Header Row Index') # check options and make type safe for int only
     dpg.add_input_text(label='Drop Rows') # hint explains that this is an array that is later parsed
     dpg.add_separator()
@@ -321,17 +321,17 @@ with dpg.window(label='Import Configurator',width=500, height=700, modal=True, s
                 dpg.add_checkbox()
 
     with dpg.group(horizontal=True):
-        dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(tags.import_config))
+        dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(Tags.import_config))
         dpg.add_button(label="Cancel")
 
-# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, tags.data_manager_tab)
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'}, tags.data_manager_tab)
-add_new_data_instance(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'}, tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, Tags.data_manager_tab)
+# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'}, Tags.data_manager_tab)
+add_new_data_instance(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'}, Tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
 # dpg.show_item_registry()
-dpg.set_primary_window(tags.mainwin,True)
+dpg.set_primary_window(Tags.mainwin, True)
 dpg.start_dearpygui()
 dpg.destroy_context()

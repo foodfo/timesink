@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from utils import plots, data
 from utils import * # REFACTOR: temporary until I manage Globals better
-import tags
+from tags import Tags
 from typing import Dict
 from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
 
@@ -360,7 +360,7 @@ def add_series_to_plot_from_axis(sender, app_data, user_data):
     # add axis to current plot instance
     # 1. get data to add to PlotData
     # 2. process params for alternate inputs
-    # 3. create PlotAxes which holds plot type and tags, defining the x and y axis for plotting - alos handles converting axes around for different plot types (FFT, Histogram)
+    # 3. create PlotAxes which holds plot type and Tags, defining the x and y axis for plotting - alos handles converting axes around for different plot types (FFT, Histogram)
     # 4. add PlotAxes to PlotInstance
     # 5. plot line with selected style
 
@@ -515,6 +515,7 @@ def add_new_plot_instance():
     plot_manager_tag = dpg.generate_uuid()
     plot_graph_tag = dpg.generate_uuid()
     plot_legend_tag =  dpg.generate_uuid()
+    # REFACTOR: move the tag generation inside __init__ to clean things up
 
     pi = PlotInstance(instance_tag=plot_instance_tag, manager_tag=plot_manager_tag,graph_tag=plot_graph_tag, legend_tag=plot_legend_tag)
 
@@ -528,13 +529,13 @@ def add_new_plot_instance():
 
     plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot')
 
-    dpg.add_button(label=pi.plot_name, width=-1, parent=tags.plot_manager_tab, tag=pi.manager_tag, callback=configure_plot, user_data=pi)
+    dpg.add_button(label=pi.plot_name, width=-1, parent=Tags.plot_manager_tab, tag=pi.manager_tag, callback=configure_plot, user_data=pi)
     #
-    # with dpg.collapsing_header(parent=tags.plot_manager_tab, default_open=True, tag=pi.manager_tag):
+    # with dpg.collapsing_header(parent=Tags.plot_manager_tab, default_open=True, tag=pi.manager_tag):
     #     dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data) # TODO: see if theres a better way to do this now that everything is a class
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=drop_item_on_plot_handler, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle tags directly
+    with dpg.plot(width=-1, parent=Tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=drop_item_on_plot_handler, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle Tags directly
         dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
         # dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -647,8 +648,8 @@ def configure_plot(sender, app_data, user_data):
 
     def clear_plot():
         # clear plot just deletes the old plot and manager, creates a new one, then slots it in the same location as the old one
-        manager_children = dpg.get_item_children(tags.plot_manager_tab)[1]
-        graph_children = dpg.get_item_children(tags.plot_window)[1]
+        manager_children = dpg.get_item_children(Tags.plot_manager_tab)[1]
+        graph_children = dpg.get_item_children(Tags.plot_window)[1]
         manager_index = manager_children.index(pi.manager_tag)
         graph_index = graph_children.index(pi.graph_tag)
         before_manager_tag = manager_children[manager_index+1] if manager_index+1 < len(manager_children) else None

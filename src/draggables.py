@@ -3,7 +3,7 @@ from importlib.metadata import pass_none
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-import tags
+from tags import Tags
 from utils import *
 
 
@@ -120,7 +120,7 @@ def add_annotation_to_plot(sender, app_data, user_data):
     mouse_coords = dpg.get_plot_mouse_pos()
     mouse_screen_coords = dpg.get_mouse_pos()
 
-    # pregen the tags to use them in user data
+    # pregen the Tags to use them in user data
     offset = dpg.generate_uuid()
     default_color = dpg.generate_uuid()
     txt = dpg.generate_uuid()
@@ -150,7 +150,7 @@ def add_annotation_to_plot(sender, app_data, user_data):
 
 
 
-# TODO: figure out how to have them linked thru different plots. can maybe use source? a linked tags list?
+# TODO: figure out how to have them linked thru different plots. can maybe use source? a linked Tags list?
 def add_trim_window(sender, app_data, user_data):
     user_data = dpg.get_item_user_data(sender)
     plot_instance_tag = user_data
@@ -202,7 +202,7 @@ def tansform_axis_to_axis_coordinates(source, destination):
 
 
 def draggable_options():
-    with dpg.group(parent=tags.draggables):
+    with dpg.group(parent=Tags.draggables):
         dpg.add_button(label='Annotation') #TODO: add some text explaining function when enter pressed.  also consider a way to manage annotations later
         with dpg.drag_payload(parent=dpg.last_item(),drag_data={'draggable':'Annotation'}):
             dpg.add_text('Annotation')

@@ -2,32 +2,40 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import dearpygui.dearpygui as dpg
-import tags
+from tags import Tags
 from utils import data
+from typing import Dict
+
 
 
 class DataInstance:
-    def __init__(self, file_path, instance_tag, manager_tag, quick_format_options=None):
-        self.file_path = file_path
+    def __init__(self, file_path: str, quick_format_options: Dict = None):
+
         self.file_name = Path(file_path).stem
-        self.instance_tag = instance_tag
-        self.manager_tag = manager_tag
-        self.df = self._convert_to_dataframe(file_path, quick_format_options)
-        # self.alias = self._init_alias_dict(self.df, self.file_name)
-        self.x_axis = None # consider making _x_axis marked private
+        self.file_alias = self.file_name # initialize the same
 
+        self.instance_tag = Tags.generate()
+        self.manager_tag = Tags.generate()
 
-        self.file_alias = self.file_name
-        self.col_names = tuple(self.df.columns)
-        self.col_aliases = self.col_names # initialize them the same
-        self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
-        self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
+        self.df = self._load_dataframe(file_path, quick_format_options)
         self.source_x_axis_name = self.df.columns[0]
+        self._header_to_alias: Dict[str,str] = {header: header for header in self.df.columns}
+
         self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
         self._extra_drag_payload_params = self._init_extra_drag_payload_params(None)
-        # self.source_x_axis = self.get_column(self.df.columns[0])
-        # self.x_alias = self.source_x_axis[1]
 
+
+    @property
+    def col_names(self) -> tuple:
+        return tuple(self._header_to_alias.keys())
+
+    @property
+    def col_alias(self) -> tuple:
+        return tuple(self._header_to_alias.values())
+
+    @property
+    def _alias_to_header(self) -> Dict[str,str]:
+        return {alias: header for header, alias in self._header_to_alias.items()}
 
 
     def get_alias_from_name(self, name):
@@ -44,16 +52,10 @@ class DataInstance:
         else:
             return None # TODO decide if this is enough protection
 
-        # return {
-        #         "name": col_name,
-        #         "alias": self.get_alias_from_name(col_name),
-        #         "data": self.df[col_name]
-        #     }# (name, alias, df[data])
-
         return (col_name,self.get_alias_from_name(col_name),self.df[col_name]) # (name, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
 
     def update_alias_list(self):
-        self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple
+        self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple -- THIS MAY be a geerator not a tuble right now. may need to cast to tupel
 
     def set_file_alias(self,text):
         if text == '' or None:
@@ -116,61 +118,7 @@ class DataInstance:
 
     def get_drag_payload_data(self, col_name):
         return {'instance_tag':self.instance_tag, 'col_name':col_name, 'extra_params':self._extra_drag_payload_params[col_name]}
-
-    # def prepend_file_alias(self, col_alias):
-    #     col_name = self.get_name_from_alias(col_alias)
-    #     prepended_col_alias = self.file_alias + '_' + col_alias
-    #     self.set_col_alias(col_name, prepended_col_alias)
-    #
-    #
-    # def undo_prepend_file_alias(self, col_alias):
-    #     col_name = self.get_name_from_alias(col_alias):
-    #     undo_prepend_col_alias = col_alias.strip(self.file_alias + '_')
-    #     self.set_col_alias(col_name, undo_prepend_col_alias)
-
-    # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
-    #     self.alias.update(alias)
-    #
-    # def get_column_aliases(self, skip_first=True):
-    #     """
-    #     Returns a list of (key, value) tuples for all columns.
-    #     Optionally skip the first alias (usually the filename).
-    #     """
-    #     aliases = list(self.alias.items())
-    #     if skip_first:
-    #         return aliases[1:]
-    #     return aliases
-    #
-    # # probably break out to file_name and file_alias and col_name and col_alias
-    # # maybe each ds is called a series?
-    # def get_filename_alias(self):
-    #     """
-    #     Returns the first alias (usually the filename).
-    #     """
-    #     first_key, first_val = next(iter(self.alias.items()))
-    #     return first_key, first_val
-
-    # def set_x_axis(self, col_name):
-    #     if self.x_axis is None:
-    #         self.x_axis = np.array(self.df[col_name], dtype=float)
-    #     else:
-    #         raise ValueError('X AXIS ALREADY ASSIGNED')  # TODO: somehow figure out how to manage series with more than 1 x axis. i think x axis needs to be assigned as a property of the plot, not of the data Y vals
-    #
-    # def get_x_axis(self):
-    #     if self.x_axis is None: # TODO: make sure this actually works
-    #         return np.array(self.df['_index'], dtype=float)
-    #     return self.x_axis
-    #
-    # def get_y_axis(self, col_name):
-    #     return np.array(self.df[col_name], dtype=float)
-
-    # # TODO: make the aliases the keys that way you can aliases.key to get the corresponding col_name
-    # @staticmethod
-    # def _init_alias_dict(df, file_name):
-    #     alias_dict = {file_name: file_name}
-    #     for header in df.columns:
-    #         alias_dict[header] = header
-    #     return alias_dict
+        #REFACTOR: make drag payload data and extra params into a dataclass for type safety and autocomplete
 
     def _init_extra_drag_payload_params(self, col_name=None):
         params = {
@@ -192,7 +140,7 @@ class DataInstance:
             return None
 
     @staticmethod
-    def _convert_to_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
+    def _load_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
 
         ext = Path(file_path).suffix
 
@@ -212,21 +160,236 @@ class DataInstance:
     #     alias_to_header = {val: key for key, val in header_to_alias.items()}
     #
     #     return alias_to_header
+    #
+    # @staticmethod
+    # def _init_names_to_alias_map(col_names):
+    #     return {name: name for name in col_names}
+    #
+    #
 
-    @staticmethod
-    def _init_names_to_alias_map(col_names):
-        return {name: name for name in col_names}
 
+#
+# class DataInstance:
+#     def __init__(self, file_path, instance_tag, manager_tag, quick_format_options=None):
+#         self.file_path = file_path
+#         self.file_name = Path(file_path).stem
+#         self.instance_tag = instance_tag
+#         self.manager_tag = manager_tag
+#         self.df = self._convert_to_dataframe(file_path, quick_format_options)
+#         # self.alias = self._init_alias_dict(self.df, self.file_name)
+#         self.x_axis = None # consider making _x_axis marked private
+#
+#
+#         self.file_alias = self.file_name
+#         self.col_names = tuple(self.df.columns)
+#         self.col_aliases = self.col_names # initialize them the same
+#         self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
+#         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
+#         self.source_x_axis_name = self.df.columns[0]
+#         self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
+#         self._extra_drag_payload_params = self._init_extra_drag_payload_params(None)
+#         # self.source_x_axis = self.get_column(self.df.columns[0])
+#         # self.x_alias = self.source_x_axis[1]
+#
+#
+#
+#     def get_alias_from_name(self, name):
+#         return self.col_names_map[name]
+#
+#     def get_name_from_alias(self, alias):
+#         return self.col_aliases_map[alias]
+#
+#     def get_column(self, name_or_alias):  # first index: column name, second index: data
+#         if name_or_alias in self.col_names:
+#             col_name = name_or_alias
+#         elif name_or_alias in self.col_aliases:
+#             col_name = self.get_name_from_alias(name_or_alias)
+#         else:
+#             return None # TODO decide if this is enough protection
+#
+#         # return {
+#         #         "name": col_name,
+#         #         "alias": self.get_alias_from_name(col_name),
+#         #         "data": self.df[col_name]
+#         #     }# (name, alias, df[data])
+#
+#         return (col_name,self.get_alias_from_name(col_name),self.df[col_name]) # (name, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
+#
+#     def update_alias_list(self):
+#         self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple -- THIS MAY be a geerator not a tuble right now. may need to cast to tupel
+#
+#     def set_file_alias(self,text):
+#         if text == '' or None:
+#             self.file_alias = self.file_name
+#         else:
+#             self.file_alias = text
+#
+#         # if self._is_prepended_alias:
+#         #     for alias in self.col_aliases:
+#         #         self.prepend_file_alias(alias)
+#
+#     def set_col_alias(self, name, alias): # set new column alias for column that already exists
+#         # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
+#         if alias in self.col_aliases:
+#             raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
+#             # return
+#
+#         old_alias = self.get_alias_from_name(name)
+#         if alias == '' or None:
+#             self.col_aliases_map[name] = self.col_aliases_map.pop(old_alias)
+#         else:
+#             self.col_aliases_map[alias] = self.col_aliases_map.pop(old_alias)
+#
+#         # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
+#         self.update_alias_list()
+#         self.col_names_map = reverse_dict_mapping(self.col_aliases_map)
+#
+#     def set_source_x_axis(self, col_name):
+#         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
+#         self.source_x_axis_name = col_name
+#
+#     def add_new_column(self, data, col_name,col_alias):
+#
+#         if col_name in self.col_names:
+#             raise ValueError('COLUMN NAME ALREADY PRESENT IN DATA')
+#
+#         if col_alias is None:
+#             col_alias = col_name
+#
+#
+#         self.df[col_name] = data
+#         self.col_names_map[col_name] = col_alias
+#
+#         # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
+#         self.col_aliases_map = reverse_dict_mapping((self.col_names_map))
+#         self.update_alias_list()
+#         self.col_names=tuple(self.df.columns)  # TODO: there MUST be a smoother way to update all of these items
+#         self._init_extra_drag_payload_params(col_name)
+#
+#     def get_prepended_alias(self, alias):
+#         if self.is_prepended_alias:
+#             return self.file_alias + '_' + alias
+#         else:
+#             return alias
+#
+#
+#
+#     def set_extra_drag_payload_params(self, col_name, user_params):
+#         self._extra_drag_payload_params[col_name] = user_params
+#
+#     def get_drag_payload_data(self, col_name):
+#         return {'instance_tag':self.instance_tag, 'col_name':col_name, 'extra_params':self._extra_drag_payload_params[col_name]}
+#         #REFACTOR: make drag payload data and extra params into a dataclass for type safety and autocomplete
+#
+#     # def prepend_file_alias(self, col_alias):
+#     #     col_name = self.get_name_from_alias(col_alias)
+#     #     prepended_col_alias = self.file_alias + '_' + col_alias
+#     #     self.set_col_alias(col_name, prepended_col_alias)
+#     #
+#     #
+#     # def undo_prepend_file_alias(self, col_alias):
+#     #     col_name = self.get_name_from_alias(col_alias):
+#     #     undo_prepend_col_alias = col_alias.strip(self.file_alias + '_')
+#     #     self.set_col_alias(col_name, undo_prepend_col_alias)
+#
+#     # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
+#     #     self.alias.update(alias)
+#     #
+#     # def get_column_aliases(self, skip_first=True):
+#     #     """
+#     #     Returns a list of (key, value) tuples for all columns.
+#     #     Optionally skip the first alias (usually the filename).
+#     #     """
+#     #     aliases = list(self.alias.items())
+#     #     if skip_first:
+#     #         return aliases[1:]
+#     #     return aliases
+#     #
+#     # # probably break out to file_name and file_alias and col_name and col_alias
+#     # # maybe each ds is called a series?
+#     # def get_filename_alias(self):
+#     #     """
+#     #     Returns the first alias (usually the filename).
+#     #     """
+#     #     first_key, first_val = next(iter(self.alias.items()))
+#     #     return first_key, first_val
+#
+#     # def set_x_axis(self, col_name):
+#     #     if self.x_axis is None:
+#     #         self.x_axis = np.array(self.df[col_name], dtype=float)
+#     #     else:
+#     #         raise ValueError('X AXIS ALREADY ASSIGNED')  # TODO: somehow figure out how to manage series with more than 1 x axis. i think x axis needs to be assigned as a property of the plot, not of the data Y vals
+#     #
+#     # def get_x_axis(self):
+#     #     if self.x_axis is None: # TODO: make sure this actually works
+#     #         return np.array(self.df['_index'], dtype=float)
+#     #     return self.x_axis
+#     #
+#     # def get_y_axis(self, col_name):
+#     #     return np.array(self.df[col_name], dtype=float)
+#
+#     # # TODO: make the aliases the keys that way you can aliases.key to get the corresponding col_name
+#     # @staticmethod
+#     # def _init_alias_dict(df, file_name):
+#     #     alias_dict = {file_name: file_name}
+#     #     for header in df.columns:
+#     #         alias_dict[header] = header
+#     #     return alias_dict
+#
+#     def _init_extra_drag_payload_params(self, col_name=None):
+#         params = {
+#             'alt_x_axis': None,
+#             'axis_style': None,
+#             'histogram_bins': None,
+#             'FFT_magnitudes_arr': None,
+#             'FFT_frequencies_arr': None
+#         }
+#
+#         if col_name is None:
+#             all_params_dict = {}
+#             for name in self.col_names:
+#
+#                 all_params_dict[name] = dict(params) # wrap in dict() to make a copy to pass values rather than a reference to params
+#             return all_params_dict
+#         else:
+#             self._extra_drag_payload_params[col_name] = dict(params)
+#             return None
+#
+#     @staticmethod
+#     def _convert_to_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
+#
+#         ext = Path(file_path).suffix
+#
+#         if ext == '.txt':
+#             df = pd.read_csv(file_path, sep="\t")
+#         else:
+#             df = pd.read_csv(file_path)
+#
+#         df.insert(0, '_index', df.index)
+#         return df
+#
+#     #
+#     # @staticmethod
+#     # def _init_alias_dict2(df):
+#     #
+#     #     header_to_alias = {header: header for header in df.columns}
+#     #     alias_to_header = {val: key for key, val in header_to_alias.items()}
+#     #
+#     #     return alias_to_header
+#
+#     @staticmethod
+#     def _init_names_to_alias_map(col_names):
+#         return {name: name for name in col_names}
 
-def reverse_dict_mapping(dict):
-    return({val: key for key, val in dict.items()})
+# def reverse_dict_mapping(dict):
+#     return({val: key for key, val in dict.items()})
 
 def quick_set_x_axis(sender, app_data, user_data):
 
     ds = user_data
-    print(ds)
+    print(f'FIRST: {ds}')
     ds = dpg.get_item_user_data(sender)
-    print(ds)
+    print(f'SECOND:{ds}') # TODO: clean this up. after a bunch of experimenting, the reverse lookup with sender is REQUIRED as drag_callbacks don't appear to have any useable USER_DATA
     data_instance_tag = app_data['instance_tag']
     col_name = app_data['col_name']
     print(col_name)
@@ -236,13 +399,13 @@ def quick_set_x_axis(sender, app_data, user_data):
     # dpg.configure_item(sender,default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') #TODO: need to regenerate configurator since it goes blank after drop callback
     create_data_manager_items(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of refenerating the config window during callback creation so it doesnt open empty after changes like with the line above
 
-def create_data_manager_items(ds):
+def create_data_manager_items(ds: DataInstance):
     if dpg.does_item_exist(ds.manager_tag):  # TODO: this feels like a really crude way to do this. consider something better
         dpg.delete_item(ds.manager_tag,children_only=True)
 
     with dpg.group(parent=ds.manager_tag):
         dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_text(default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}', drop_callback=quick_set_x_axis, user_data=ds) # TODO: add a drop callback here that can set the X axis
+        dpg.add_button(label=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}', drop_callback=quick_set_x_axis, user_data=ds)
         # dpg.configure_item(source_config, show=True)
         # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
         dpg.add_separator()
@@ -251,7 +414,8 @@ def create_data_manager_items(ds):
                 alias = ds.get_alias_from_name(name)
                 dpg.add_button(label=alias)
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
-                                      drag_data=ds.get_drag_payload_data(name)):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                                      drag_data=ds.get_drag_payload_data(name),
+                                      user_data=ds):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
 
                     if ds.is_prepended_alias:
                         dragged_object_name = ds.file_alias + '_' + alias
@@ -261,25 +425,9 @@ def create_data_manager_items(ds):
                     # THIS IS MAPPED INTO PLOT INSTANCE
                     # drag_data in payload becomes app_data in callback - kinda strange
 
-# def update_data_instance_columns(ds):
-#
-#     if dpg.does_item_exist(ds.column_window_tag): # TODO: this feels like a really crude way to do this. consider something better
-#         print('DELETING ITEM')
-#         dpg.delete_item(ds.column_window_tag)
-#
-#     with dpg.child_window(height=100, parent=ds.manager_tag, tag=ds.column_window_tag):
-#         for name in ds.col_names:  # keys are aliasees, cols are df headers
-#             alias = ds.get_alias_from_name(name)
-#             dpg.add_button(label=alias)
-#             with dpg.drag_payload(label=alias, parent=dpg.last_item(),drag_data={'parent_tag': ds.instance_tag, 'col_name': name,'col_alias': alias}):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-#                 dpg.add_text(alias)
-
-
-
-
 def add_new_data_instance(sender, app_data, user_data):
 
-    target_container_tag = user_data #TODO: consider moving tags into utils so they can be referenced globally rather than being passed through as user data
+    target_container_tag = user_data #TODO: consider moving Tags into utils so they can be referenced globally rather than being passed through as user data
     data_instance_tag = dpg.generate_uuid()
     data_manager_tag = dpg.generate_uuid()
     column_window_tag = dpg.generate_uuid()
@@ -301,7 +449,9 @@ def add_new_data_instance(sender, app_data, user_data):
     #     with dpg.theme_component(dpg.mvCollapsingHeader):
     #         pass  # empty for all buttons
 
-    ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
+    # ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
+    ds = DataInstance(file_path=app_data['file_path_name'])
+
 
     data[ds.instance_tag] = ds
 
@@ -326,7 +476,6 @@ def add_new_data_instance(sender, app_data, user_data):
         #         with dpg.drag_payload(label=alias,parent=dpg.last_item(),drag_data={'parent_tag':ds.instance_tag,'col_name':name,'col_alias':alias}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
         #             dpg.add_text(alias)
 
-
 # configure options for data instance (alias, preferred x axis, axis manipulation) # TODO: should probably live in data_instance.py
 def configure_data(sender, app_data, user_data) -> None:
 
@@ -336,7 +485,7 @@ def configure_data(sender, app_data, user_data) -> None:
     TEXT_BOX_WIDTH = 150
     COLUMN_RENAME_HEIGHT = 150
 
-    # init tags
+    # init Tags
     file_alias_choice = None
     prepend_alias_choice = None
     x_axis_choice = None
@@ -389,14 +538,14 @@ def configure_data(sender, app_data, user_data) -> None:
 
         # update_data_instance_columns(ds)
         create_data_manager_items(ds)
-        dpg.delete_item(tags.source_config)
+        dpg.delete_item(Tags.source_config)
 
         print(ds.file_alias)
         print(ds.source_x_axis_name)
         print(ds.col_aliases_map)
 
     def delete_config_window():
-        dpg.delete_item(tags.source_config)
+        dpg.delete_item(Tags.source_config)
 
 
     def delete_data_callback():
@@ -418,7 +567,7 @@ def configure_data(sender, app_data, user_data) -> None:
             # dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4)
 
 
-    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25), tag=tags.source_config):
+    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25), tag=Tags.source_config):
         # with dpg.tab_bar():
         # with dpg.tab(label='Fields'):
         dpg.add_separator(label='Rename File')
@@ -458,95 +607,3 @@ def configure_data(sender, app_data, user_data) -> None:
             dpg.add_button(label="Delete Series", callback=delete_data_callback)
             dpg.bind_item_theme(dpg.last_item(), delete_theme)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-################################################################
-
-
-        # with dpg.table(header_row=False, borders_innerH=False, borders_innerV=False, borders_outerH=False, borders_outerV=False):
-        #     dpg.add_table_column()
-        #     dpg.add_table_column()
-        #     dpg.add_table_column()
-        #     with dpg.table_row():
-        #         dpg.add_button(label="OK", callback=print_table)
-        #         dpg.add_button(label="Cancel")
-        #         dpg.add_button(label="Delete Series")
-        #         dpg.bind_item_theme(dpg.last_item(), delete_theme)
-
-        # with dpg.group(horizontal=True):
-        #     dpg.add_button(label="OK", callback=print_table)
-        #     dpg.add_button(label="Cancel")
-        #     dpg.add_spacer(width=-1)  # stretch spacer (acts like glue)
-        #     btn = dpg.add_button(label="Delete Series")
-        #     dpg.bind_item_theme(btn, delete_theme)
-
-#
-# with dpg.table(header_row=True, borders_innerH=True,
-#                borders_outerH=True, borders_innerV=True, borders_outerV=True):
-#     for c in range(COLS):
-#         dpg.add_table_column(label=table_column_headers[c])
-#
-#     for r in range(ROWS):
-#         # for header in ds.col_aliases.values():
-#         with dpg.table_row():
-#             header_cell_tag = dpg.add_text(list(ds.col_aliases_map.values())[
-#                                                r])  # get vals is aliases (df headers), convert to list, and get index to get headers TODO: consider just exposing headers as private variable
-#             alias_cell_tag = dpg.add_input_text(no_spaces=True, width=100)
-#             xaxis_cell_tag = dpg.add_checkbox()
-#             table_tags[r] = [header_cell_tag, alias_cell_tag, xaxis_cell_tag]
-#     def print_table():
-#         out = []
-#         for r in range(ROWS):
-#             arr = []
-#             for c in range(COLS):
-#                 arr.append(dpg.get_value(table_tags[r][c]))
-#             out.append(arr)
-#         print(out)
-#
-#         for r in range(ROWS):
-#             header_cell_tag=table_tags[r][0]
-#             alias_cell_tag=table_tags[r][1]
-#             xaxis_cell_tag=table_tags[r][2]
-#
-#             header = dpg.get_value(header_cell_tag)
-#             alias = dpg.get_value(alias_cell_tag)
-#             set_x_axis = dpg.get_value(xaxis_cell_tag)
-#
-#
-#             ds.set_col_alias(header, alias)
-#
-#             print(ds.col_aliases_map)
-#
-#             print(renamed_list)
-#             print(ds.source_x_axis)
-#
-#             if set_x_axis:
-#                 ds.set_preferred_x_axis(header)
