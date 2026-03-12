@@ -6,11 +6,12 @@ import numpy as np
 
 import data_instance # TODO: collapse this to preserve namespace
 import plot_instance
-from data_instance import DataInstance, add_new_data_instance
+from data_instance import DataInstance, add_data_to_sources
 from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_instance, set_all_plot_heights
-from utils import data, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
+from utils import sources, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 from utils import * # TODO: temporary until I manage Globals better
 from tags import Tags
+from themes import Themes
 from manipulate import manipulation_options
 from draggables import draggable_options
 import export
@@ -53,6 +54,7 @@ dpg.show_viewport()
 # dpg.show_debug()
 
 Tags.init_tags()
+Themes.init_themes()
 # Tags.print_tags()
 
 
@@ -111,13 +113,13 @@ with dpg.window(tag=Tags.mainwin):
             dpg.add_menu_item(label='Export Trim Window', callback=export.open_trim_window_export)
         with dpg.menu(label="Help"):
             pass
-    with dpg.tab_bar(label = "test", tag=Tags.tabs):
-        dpg.add_tab_button(label="<<", tag="hide_sidebar",callback=hide_sidebar)
-        with dpg.tab(label="Tab 1", tag=Tags.primary_tab):
-            pass
-        with dpg.tab(label="Tab 2"):
-            pass
-        dpg.add_tab_button(label="+")
+    # with dpg.tab_bar(label = "test", tag=Tags.tabs):
+    #     dpg.add_tab_button(label="<<", tag="hide_sidebar",callback=hide_sidebar)
+    #     with dpg.tab(label="Tab 1", tag=Tags.primary_tab):
+    #         pass
+    #     with dpg.tab(label="Tab 2"):
+    #         pass
+    #     dpg.add_tab_button(label="+")
 
 
 #
@@ -150,7 +152,9 @@ with dpg.theme() as blue_header_theme: # TEAL THEME
 
 
 # everything that sits in a single tab instance
-with dpg.child_window(parent=Tags.primary_tab, border=False):
+# with dpg.child_window(parent=Tags.primary_tab, border=False):
+with dpg.child_window(parent=Tags.mainwin, border=False):
+    # dpg.add_spacer(height = 5)
     with dpg.group(horizontal=True):
             # with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=Tags.options_window):
         with dpg.child_window(resizable_x=True, width=SIDEBAR_WIDTH, border=False, tag=Tags.sidebar):
@@ -198,9 +202,9 @@ with dpg.child_window(parent=Tags.primary_tab, border=False):
                     dpg.add_button(label="ADD DATA", callback=show_file_dialog, user_data=dpg.last_container())
                     dpg.add_separator()
                     dpg.add_spacer(height=10)
-                    with dpg.group(tag = Tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
-                        # dpg.bind_item_theme(Tags.data_manager_tab, neutral_theme)
-                        pass
+                    # with dpg.group(tag = Tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
+                    #     # dpg.bind_item_theme(Tags.data_manager_tab, neutral_theme)
+                    #     pass
 
             # this is the actual plot area
         with dpg.child_window(autosize_x=True, autosize_y=True, border=False, tag=Tags.plot_window):
@@ -281,7 +285,7 @@ quick_format_choices = ('None','OmegaTempLogger','ConvergenceInstruments')
 preprocessor_choices = ('None','WDH.py','WingTester.py','RainflowCounting.py')
 
 
-with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400, tag="file_dialog", callback=add_new_data_instance, default_path='/Users/tyler/Downloads'):
+with dpg.file_dialog(directory_selector=False, show=False, width=400, height=400, tag="file_dialog", callback=add_data_to_sources, default_path='/Users/tyler/Downloads'):
     dpg.add_file_extension('.csv',color=(150, 255, 150, 255))
     dpg.add_file_extension('.txt',color=(150, 150, 255, 255))
 
@@ -324,14 +328,14 @@ with dpg.window(label='Import Configurator', width=500, height=700, modal=True, 
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(Tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_new_data_instance(None, {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'}, Tags.data_manager_tab)
+add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
 # add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'}, Tags.data_manager_tab)
 # add_new_data_instance(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'}, Tags.data_manager_tab)
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
-# dpg.show_item_registry()
+dpg.show_item_registry()
 dpg.set_primary_window(Tags.mainwin, True)
 dpg.start_dearpygui()
 dpg.destroy_context()

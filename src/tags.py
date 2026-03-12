@@ -9,9 +9,9 @@ class Tags:
     @staticmethod
     def init_tags() -> None:
         Tags.source_config = Tags.generate()
-        Tags.mainwin = Tags.generate()
+        Tags.main_window = Tags.generate()
         Tags.primary_tab = Tags.generate()
-        Tags.tabs = Tags.generate()
+        # Tags.tabs = Tags.generate()
         Tags.sidebar = Tags.generate()
         Tags.options_window = Tags.generate()
         Tags.managers_window = Tags.generate()

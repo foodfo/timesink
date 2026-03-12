@@ -1,25 +1,38 @@
 from pathlib import Path
 import pandas as pd
-import dearpygui.dearpygui as dpg
-from tags import Tags
-from utils import data
 from typing import Dict
+from dataclasses import dataclass
+import dearpygui.dearpygui as dpg
+from themes import Themes
+from tags import Tags
+from utils import sources, DragItemType
+
+@dataclass
+class ColumnParams: # addition attributes can be assigned to any column
+    alt_x_axis: str | None = None
+    axis_style: str | None = None
+    histogram_bins: int = None
+    fft_magnitudes_arr: list | None = None
+    fft_frequencies_arr: list | None = None
+
+@dataclass
+class DragPayloadColumn:
+    ds: 'DataInstance'
+    col_header_to_plot: str
+    params: ColumnParams
+    type: DragItemType
 
 class DataInstance:
     def __init__(self, file_path: str, quick_format_options: Dict = None):
 
         self.file_name = Path(file_path).stem
         self.file_alias = self.file_name # initialize them the same
-
         self.instance_tag = Tags.generate()
         self.manager_tag = Tags.generate()
-
-        self.df = self._load_dataframe(file_path, quick_format_options)
+        self.df = self._create_dataframe(file_path, quick_format_options)
         self.x_axis_header = self.df.columns[0]
         self._header_to_alias: Dict[str,str] = {header: header for header in self.df.columns}
-
-        self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
-        self._extra_drag_payload_params = self._init_extra_drag_payload_params(None)
+        self._all_column_params: Dict[str, ColumnParams] = {name: ColumnParams() for name in self.df.columns}
 
 
     @property
@@ -30,6 +43,9 @@ class DataInstance:
     def col_aliases(self) -> tuple:
         return tuple(self._header_to_alias.values())
 
+    def delete(self) -> None:
+        dpg.delete_item(self.manager_tag)
+
     def get_alias_from_header(self, name) -> str:
         return self._header_to_alias[name]
 
@@ -39,15 +55,14 @@ class DataInstance:
         else:
             self.file_alias = text
 
+    # REFACTOR: THIS IS THE MAIN ENTRY POINT FOR MANIPULATE. MAYBE CLEAN THIS UP FOR BETTER ACCESS. USE DRAG PAYLOAD CLASS INSTEAD?
     def get_column(self, header_or_alias) -> tuple|None:
         if header_or_alias in self.col_headers:
             header = header_or_alias
         else:
-            header = next(h for h, a in self._header_to_alias.items() if a == header_or_alias)
-
+            header = next((h for h, a in self._header_to_alias.items() if a == header_or_alias), None)
         if header is None:
             return None # TODO decide if this is enough protection
-
         return (header, self.get_alias_from_header(header), self.df[header]) # (header, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
 
     def set_col_alias(self, header, alias) -> None:
@@ -57,517 +72,124 @@ class DataInstance:
             alias = header
         self._header_to_alias[header] = alias
 
-    def add_new_column(self, data: SeriesList, header, alias) -> None:
-
+    def add_new_column(self, values: pd.DataFrame, header, alias, params: 'ColumnParams') -> None:
         if header in self.col_headers:
             raise ValueError('COLUMN NAME ALREADY PRESENT IN DATA')
-
         if alias is None:
             alias = header
-
-        self.df[header] = data
+        self.df[header] = values
         self._header_to_alias[header] = alias
-        self._init_extra_drag_payload_params(header) # TODO: make sure this is good. maybe rename it
+        self._all_column_params[header] = params if params is not None else ColumnParams()
 
-    def get_prepended_alias(self, alias):   # TODO: MOVE THIS TO PLOTMANAGER
-        if self.is_prepended_alias:
-            return self.file_alias + '_' + alias
-        else:
-            return alias
+    def set_column_params(self, col_header, params: ColumnParams) -> None:
+        self._all_column_params[col_header] = params
 
-
-    # TODO: work on extra drag payload params. make a dataclass
-    def set_extra_drag_payload_params(self, col_name, user_params):
-        self._extra_drag_payload_params[col_name] = user_params
-
-    def get_drag_payload_data(self, col_name):
-        return {'instance_tag':self.instance_tag, 'col_name':col_name, 'extra_params':self._extra_drag_payload_params[col_name]}
-        #REFACTOR: make drag payload data and extra params into a dataclass for type safety and autocomplete
-
-    def _init_extra_drag_payload_params(self, col_name=None):
-        params = {
-            'alt_x_axis': None,
-            'axis_style': None,
-            'histogram_bins': None,
-            'FFT_magnitudes_arr': None,
-            'FFT_frequencies_arr': None
-        }
-
-        if col_name is None:
-            all_params_dict = {}
-            for name in self.col_headers:
-
-                all_params_dict[name] = dict(params) # wrap in dict() to make a copy to pass values rather than a reference to params
-            return all_params_dict
-        else:
-            self._extra_drag_payload_params[col_name] = dict(params)
-            return None
+    def drag_and_drop_column(self, col_header) -> DragPayloadColumn:
+        return DragPayloadColumn(ds=self,
+                                 col_header_to_plot=col_header,
+                                 params=self._all_column_params[col_header],
+                                 type=DragItemType.DATA)
 
     @staticmethod
-    def _load_dataframe(file_path, quick_format_options) -> pd.DataFrame: # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
-
+    def _create_dataframe(file_path, quick_format_options) -> pd.DataFrame: # FEATURE add quick format processing to drop rows, rename df, set datetimee, rename headers
         ext = Path(file_path).suffix
-
         if ext == '.txt':
             df = pd.read_csv(file_path, sep="\t")
         else:
             df = pd.read_csv(file_path)
-
         df.insert(0, '_index', df.index)
         return df
 
-    #
-    # @staticmethod
-    # def _init_alias_dict2(df):
-    #
-    #     header_to_alias = {header: header for header in df.columns}
-    #     alias_to_header = {val: key for key, val in header_to_alias.items()}
-    #
-    #     return alias_to_header
-    #
-    # @staticmethod
-    # def _init_names_to_alias_map(col_names):
-    #     return {name: name for name in col_names}
-    #
-    #
+def quick_set_x_axis(sender, app_data: DragPayloadColumn):
+    ds = dpg.get_item_user_data(sender) # user data is not passed with drop_callback so we fetch it manually
+    ds.x_axis_header = app_data.col_header_to_plot
+    populate_data_manager(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of regenerating the config window during callback creation so it doesnt open empty after changes like with the line above. Previously just tried configureitemlabel
 
-
-#
-# class DataInstance:
-#     def __init__(self, file_path, instance_tag, manager_tag, quick_format_options=None):
-#         self.file_path = file_path
-#         self.file_name = Path(file_path).stem
-#         self.instance_tag = instance_tag
-#         self.manager_tag = manager_tag
-#         self.df = self._convert_to_dataframe(file_path, quick_format_options)
-#         # self.alias = self._init_alias_dict(self.df, self.file_name)
-#         self.x_axis = None # consider making _x_axis marked private
-#
-#
-#         self.file_alias = self.file_name
-#         self.col_names = tuple(self.df.columns)
-#         self.col_aliases = self.col_names # initialize them the same
-#         self.col_names_map = self._init_names_to_alias_map(self.col_names) # key=name, val=alias
-#         self.col_aliases_map = reverse_dict_mapping(self.col_names_map) # key=alias, val=name
-#         self.source_x_axis_name = self.df.columns[0]
-#         self.is_prepended_alias = True # TODO: auto mark prepend True once there is more than one DataInstance and flip back to false when deleting down to just one
-#         self._extra_drag_payload_params = self._init_extra_drag_payload_params(None)
-#         # self.source_x_axis = self.get_column(self.df.columns[0])
-#         # self.x_alias = self.source_x_axis[1]
-#
-#
-#
-#     def get_alias_from_name(self, name):
-#         return self.col_names_map[name]
-#
-#     def get_name_from_alias(self, alias):
-#         return self.col_aliases_map[alias]
-#
-#     def get_column(self, name_or_alias):  # first index: column name, second index: data
-#         if name_or_alias in self.col_names:
-#             col_name = name_or_alias
-#         elif name_or_alias in self.col_aliases:
-#             col_name = self.get_name_from_alias(name_or_alias)
-#         else:
-#             return None # TODO decide if this is enough protection
-#
-#         # return {
-#         #         "name": col_name,
-#         #         "alias": self.get_alias_from_name(col_name),
-#         #         "data": self.df[col_name]
-#         #     }# (name, alias, df[data])
-#
-#         return (col_name,self.get_alias_from_name(col_name),self.df[col_name]) # (name, alias, df[data]) # TODO: decide if tuple is better than dict. will need to change in plot instance initializer to .values()
-#
-#     def update_alias_list(self):
-#         self.col_aliases = (key for key in self.col_aliases_map.keys()) # TODO: decide if should be arr or tuple -- THIS MAY be a geerator not a tuble right now. may need to cast to tupel
-#
-#     def set_file_alias(self,text):
-#         if text == '' or None:
-#             self.file_alias = self.file_name
-#         else:
-#             self.file_alias = text
-#
-#         # if self._is_prepended_alias:
-#         #     for alias in self.col_aliases:
-#         #         self.prepend_file_alias(alias)
-#
-#     def set_col_alias(self, name, alias): # set new column alias for column that already exists
-#         # oldAlias = next((key for key, val in self.col_aliases_map.items() if val == name), None)
-#         if alias in self.col_aliases:
-#             raise ValueError("ALIAS ALREADY USED, CHOOSE ANOTHER ALIAS")
-#             # return
-#
-#         old_alias = self.get_alias_from_name(name)
-#         if alias == '' or None:
-#             self.col_aliases_map[name] = self.col_aliases_map.pop(old_alias)
-#         else:
-#             self.col_aliases_map[alias] = self.col_aliases_map.pop(old_alias)
-#
-#         # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
-#         self.update_alias_list()
-#         self.col_names_map = reverse_dict_mapping(self.col_aliases_map)
-#
-#     def set_source_x_axis(self, col_name):
-#         # self.source_x_axis = (col_name, self.get_alias_from_name(col_name), self.df[col_name])
-#         self.source_x_axis_name = col_name
-#
-#     def add_new_column(self, data, col_name,col_alias):
-#
-#         if col_name in self.col_names:
-#             raise ValueError('COLUMN NAME ALREADY PRESENT IN DATA')
-#
-#         if col_alias is None:
-#             col_alias = col_name
-#
-#
-#         self.df[col_name] = data
-#         self.col_names_map[col_name] = col_alias
-#
-#         # IMPORTANT: regenerate the alias list and regenerate the column names mapping as they're used by internal class logic
-#         self.col_aliases_map = reverse_dict_mapping((self.col_names_map))
-#         self.update_alias_list()
-#         self.col_names=tuple(self.df.columns)  # TODO: there MUST be a smoother way to update all of these items
-#         self._init_extra_drag_payload_params(col_name)
-#
-#     def get_prepended_alias(self, alias):
-#         if self.is_prepended_alias:
-#             return self.file_alias + '_' + alias
-#         else:
-#             return alias
-#
-#
-#
-#     def set_extra_drag_payload_params(self, col_name, user_params):
-#         self._extra_drag_payload_params[col_name] = user_params
-#
-#     def get_drag_payload_data(self, col_name):
-#         return {'instance_tag':self.instance_tag, 'col_name':col_name, 'extra_params':self._extra_drag_payload_params[col_name]}
-#         #REFACTOR: make drag payload data and extra params into a dataclass for type safety and autocomplete
-#
-#     # def prepend_file_alias(self, col_alias):
-#     #     col_name = self.get_name_from_alias(col_alias)
-#     #     prepended_col_alias = self.file_alias + '_' + col_alias
-#     #     self.set_col_alias(col_name, prepended_col_alias)
-#     #
-#     #
-#     # def undo_prepend_file_alias(self, col_alias):
-#     #     col_name = self.get_name_from_alias(col_alias):
-#     #     undo_prepend_col_alias = col_alias.strip(self.file_alias + '_')
-#     #     self.set_col_alias(col_name, undo_prepend_col_alias)
-#
-#     # def set_alias(self, alias): # alias is dict with key=colname, val=user_data
-#     #     self.alias.update(alias)
-#     #
-#     # def get_column_aliases(self, skip_first=True):
-#     #     """
-#     #     Returns a list of (key, value) tuples for all columns.
-#     #     Optionally skip the first alias (usually the filename).
-#     #     """
-#     #     aliases = list(self.alias.items())
-#     #     if skip_first:
-#     #         return aliases[1:]
-#     #     return aliases
-#     #
-#     # # probably break out to file_name and file_alias and col_name and col_alias
-#     # # maybe each ds is called a series?
-#     # def get_filename_alias(self):
-#     #     """
-#     #     Returns the first alias (usually the filename).
-#     #     """
-#     #     first_key, first_val = next(iter(self.alias.items()))
-#     #     return first_key, first_val
-#
-#     # def set_x_axis(self, col_name):
-#     #     if self.x_axis is None:
-#     #         self.x_axis = np.array(self.df[col_name], dtype=float)
-#     #     else:
-#     #         raise ValueError('X AXIS ALREADY ASSIGNED')  # TODO: somehow figure out how to manage series with more than 1 x axis. i think x axis needs to be assigned as a property of the plot, not of the data Y vals
-#     #
-#     # def get_x_axis(self):
-#     #     if self.x_axis is None: # TODO: make sure this actually works
-#     #         return np.array(self.df['_index'], dtype=float)
-#     #     return self.x_axis
-#     #
-#     # def get_y_axis(self, col_name):
-#     #     return np.array(self.df[col_name], dtype=float)
-#
-#     # # TODO: make the aliases the keys that way you can aliases.key to get the corresponding col_name
-#     # @staticmethod
-#     # def _init_alias_dict(df, file_name):
-#     #     alias_dict = {file_name: file_name}
-#     #     for header in df.columns:
-#     #         alias_dict[header] = header
-#     #     return alias_dict
-#
-#     def _init_extra_drag_payload_params(self, col_name=None):
-#         params = {
-#             'alt_x_axis': None,
-#             'axis_style': None,
-#             'histogram_bins': None,
-#             'FFT_magnitudes_arr': None,
-#             'FFT_frequencies_arr': None
-#         }
-#
-#         if col_name is None:
-#             all_params_dict = {}
-#             for name in self.col_names:
-#
-#                 all_params_dict[name] = dict(params) # wrap in dict() to make a copy to pass values rather than a reference to params
-#             return all_params_dict
-#         else:
-#             self._extra_drag_payload_params[col_name] = dict(params)
-#             return None
-#
-#     @staticmethod
-#     def _convert_to_dataframe(file_path, quick_format_options): # TODO add quick format processing to drop rows, rename df, set datetimee, rename headers
-#
-#         ext = Path(file_path).suffix
-#
-#         if ext == '.txt':
-#             df = pd.read_csv(file_path, sep="\t")
-#         else:
-#             df = pd.read_csv(file_path)
-#
-#         df.insert(0, '_index', df.index)
-#         return df
-#
-#     #
-#     # @staticmethod
-#     # def _init_alias_dict2(df):
-#     #
-#     #     header_to_alias = {header: header for header in df.columns}
-#     #     alias_to_header = {val: key for key, val in header_to_alias.items()}
-#     #
-#     #     return alias_to_header
-#
-#     @staticmethod
-#     def _init_names_to_alias_map(col_names):
-#         return {name: name for name in col_names}
-
-# def reverse_dict_mapping(dict):
-#     return({val: key for key, val in dict.items()})
-
-def quick_set_x_axis(sender, app_data, user_data):
-
-    ds = user_data
-    print(f'FIRST: {ds}')
-    ds = dpg.get_item_user_data(sender)
-    print(f'SECOND:{ds}') # TODO: clean this up. after a bunch of experimenting, the reverse lookup with sender is REQUIRED as drag_callbacks don't appear to have any useable USER_DATA
-    data_instance_tag = app_data['instance_tag']
-    col_name = app_data['col_name']
-    print(col_name)
-    print(dpg.get_item_label(sender))
-    print(sender)
-    ds.x_axis_header = col_name # TODO: should this display the name or the alias?
-    # dpg.configure_item(sender,default_value=f'X-Axis: {ds.get_alias_from_name(ds.source_x_axis_name)}') #TODO: need to regenerate configurator since it goes blank after drop callback
-    create_data_manager_items(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of refenerating the config window during callback creation so it doesnt open empty after changes like with the line above
-
-def create_data_manager_items(ds: DataInstance):
-    if dpg.does_item_exist(ds.manager_tag):  # TODO: this feels like a really crude way to do this. consider something better
+def populate_data_manager(ds: DataInstance) -> None:
+    if dpg.does_item_exist(ds.manager_tag):
         dpg.delete_item(ds.manager_tag,children_only=True)
 
-    with dpg.group(parent=ds.manager_tag):
-        dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-        dpg.add_button(label=f'X-Axis: {ds.get_alias_from_header(ds.x_axis_header)}', drop_callback=quick_set_x_axis, user_data=ds)
-        # dpg.configure_item(source_config, show=True)
-        # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
+    with dpg.group(parent=ds.manager_tag): # parent is the collapsing header window
+        dpg.add_button(label='Configure', callback=configure_data_window, user_data=ds)
+        dpg.add_text(default_value=f'X-Axis: {ds.get_alias_from_header(ds.x_axis_header)}', drop_callback=quick_set_x_axis, user_data=ds)
         dpg.add_separator()
         with dpg.child_window(height=130, resizable_y=True):
-            for name in ds.col_headers:  # keys are aliases, cols are df headers
-                alias = ds.get_alias_from_header(name)
+            for header in ds.col_headers:  # keys are aliases, cols are df headers
+                alias = ds.get_alias_from_header(header)
                 dpg.add_button(label=alias)
+                # CREATE DRAG AND DROP COLUMN PAYLOAD - drag_data becomes app_data in callback
                 with dpg.drag_payload(label=alias, parent=dpg.last_item(), # TODO: is parent required here?
-                                      drag_data=ds.get_drag_payload_data(name),
-                                      user_data=ds):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                                      drag_data=ds.drag_and_drop_column(header)):  # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
+                    dpg.add_text(alias)
 
-                    if ds.is_prepended_alias:
-                        dragged_object_name = ds.file_alias + '_' + alias
-                    else:
-                        dragged_object_name = alias
-                    dpg.add_text(dragged_object_name)
-                    # THIS IS MAPPED INTO PLOT INSTANCE
-                    # drag_data in payload becomes app_data in callback - kinda strange
-
-def add_new_data_instance(sender, app_data, user_data):
-
-    target_container_tag = user_data #TODO: consider moving Tags into utils so they can be referenced globally rather than being passed through as user data
-    data_instance_tag = dpg.generate_uuid()
-    data_manager_tag = dpg.generate_uuid()
-    column_window_tag = dpg.generate_uuid()
-
-    # print(app_data)
-
-    # with dpg.theme() as other_theme:
-    #     with dpg.theme_component(dpg.mvCollapsingHeader):
-    #         dpg.add_theme_color(dpg.mvThemeCol_Header, (10, 10, 10, 150))  # closed
-    #         dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (10, 100,100, 200))  # hover
-    #         dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (10, 10, 10, 255))  # open
-    with dpg.theme() as other_theme:
-            with dpg.theme_component(dpg.mvCollapsingHeader):
-                dpg.add_theme_color(dpg.mvThemeCol_Header, (51,51,55,255))          # closed
-                dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (29, 151, 236, 103))  # hover
-                dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (0, 119, 200, 153))
-
-    # with dpg.theme() as other_theme:
-    #     with dpg.theme_component(dpg.mvCollapsingHeader):
-    #         pass  # empty for all buttons
-
-    # ds = DataInstance(file_path=app_data['file_path_name'], instance_tag=data_instance_tag, manager_tag=data_manager_tag)
+def add_data_to_sources(_, app_data: Dict[str,str]) -> None:
     ds = DataInstance(file_path=app_data['file_path_name'])
+    sources.add(ds) # REFACTOR: fix this when turning data into a class (app.data?)
 
+    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=Tags.data_manager_tab):
+        dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header)
 
-    data[ds.instance_tag] = ds
+    populate_data_manager(ds)
 
-    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag, ): # TODO: plot_instance just uses tag.parent instead. consider that here
-        dpg.bind_item_theme(dpg.last_item(), other_theme)
-        # dpg.bind_item_theme(dpg.last_item(), 0)
+def configure_data_window(_, __, user_data: DataInstance) -> None:
 
-
-    create_data_manager_items(ds)
-
-    # with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=target_container_tag):
-    #
-    #     dpg.add_button(label='Configure', callback=configure_data, user_data=ds)
-    #     # dpg.configure_item(source_config, show=True)
-    #     # dpg.add_button(label='Set X-Axis', drop_callback=set_x_axis)
-    #     dpg.add_separator()
-    #     update_data_instance_columns(ds)
-        # with dpg.child_window(height=100):
-        #     for name in ds.col_names: # keys are aliasees, cols are df headers
-        #         alias = ds.get_alias_from_name(name)
-        #         dpg.add_button(label=alias)
-        #         with dpg.drag_payload(label=alias,parent=dpg.last_item(),drag_data={'parent_tag':ds.instance_tag,'col_name':name,'col_alias':alias}): # TODO: really hard to figure out what this points to. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-        #             dpg.add_text(alias)
-
-# configure options for data instance (alias, preferred x axis, axis manipulation) # TODO: should probably live in data_instance.py
-def configure_data(sender, app_data, user_data) -> None:
-
-    parent_tag = dpg.get_item_parent(sender) # TODO consider wrapping this in user data for consistency?
-    ds = user_data # TODO: consider passing tag in instead of the full object. does it matter?
-    table_column_headers = ('Header', 'Alias','Set X-Axis')
-    TEXT_BOX_WIDTH = 150
+    TEXT_BOX_WIDTH = 150 # REFACTOR: MOVE THESE TO UTILS.PY OR OPTIONS.PY probably make into an ENUM
     COLUMN_RENAME_HEIGHT = 150
 
-    # init Tags
-    file_alias_choice = None
-    prepend_alias_choice = None
-    x_axis_choice = None
-    datetime_choice = None
-    operation_choice = None
-    scalar_choice = None
-    duplicate_error = None
+    ds = user_data
+    renamed_aliases = []
 
-    renamed_list = set() # TODO: rename these for clarity
-    stored_choices = set()
+    def remove_data_from_sources() -> None:
+        dpg.delete_item(Tags.source_config)  # BUG: This may error out when adding delete on right click menu
+        sources.delete(ds)
 
-    # stage changes for OK
-    def renamed_columns_callback(sender):
-        renamed_list.add(sender)
+    def save_and_close() -> None:
+        # FEATURE: implement the other config options at some point
+        ds.x_axis_header = dpg.get_value(choose_x_axis_header)
 
-    def store_choices_callback(sender, app_data, user_data):
-        # stored_choices[sender] = app_data
-        stored_choices.add(sender)
+        new_alias = dpg.get_value(choose_file_alias)
+        if new_alias:
+            ds.set_file_alias(new_alias)
+            dpg.set_item_label(ds.manager_tag, new_alias)
 
-    # send changes on OK
-    def save_config_choices_callback(sender):
-
-        if file_alias_choice in stored_choices and dpg.get_value(file_alias_choice): # skip if " "
-            ds.set_file_alias(dpg.get_value(file_alias_choice))
-            dpg.set_item_label(ds.manager_tag, ds.file_alias) # TODO: maybe need to make an updater function that does the whole configurator manager in one place
-
-        if x_axis_choice in stored_choices:
-            if ds.x_axis_header != dpg.get_value(x_axis_choice): # skip if its the same text
-                ds.x_axis_header(dpg.get_value(x_axis_choice)) # TODO: review source_x_axis logic in this project and decide if it makes more sense for it to be an alias or a name
-
-        if prepend_alias_choice in stored_choices:
-            if dpg.get_value(prepend_alias_choice):
-                ds.is_prepended_alias = True
-            else:
-                ds.is_prepended_alias = False
-
-        # TODO: implement the other config options at some point
-
-        for tag in renamed_list:
+        for tag in renamed_aliases:
             col_alias = dpg.get_value(tag)
             col_name = dpg.get_item_label(tag)
-
-            if col_alias in ds.col_aliases:
+            original_alias = ds.get_alias_from_header(col_name)
+            if col_alias == original_alias:
+                continue
+            if col_alias != original_alias and col_alias in ds.col_aliases:
                 dpg.show_item(duplicate_error)
                 return
-
             if col_alias:
-                dpg.hide_item(duplicate_error)
                 ds.set_col_alias(col_name, col_alias)
 
-        # update_data_instance_columns(ds)
-        create_data_manager_items(ds)
+        populate_data_manager(ds)
         dpg.delete_item(Tags.source_config)
 
-        print(ds.file_alias)
-        print(ds.x_axis_header)
-        print(ds.col_aliases)
-
-    def delete_config_window():
-        dpg.delete_item(Tags.source_config)
-
-
-    def delete_data_callback():
-        delete_config_window()
-        dpg.delete_item(ds.manager_tag) # delete manager
-        data.pop(ds.instance_tag) # TODO: see if theres a better way than storing the data in UTILS
-    # TODO: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
-
-    with dpg.theme() as red_text_theme:
-        with dpg.theme_component(dpg.mvText):
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 0, 0, 255))  # RGBA
-
-    with dpg.theme() as delete_theme:
-        with dpg.theme_component(dpg.mvButton):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, (180, 60, 60))  # neutral red
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (200, 80, 80))  # lighter red
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (160, 40, 40))  # darker red
-            # dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
-            # dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4)
-
-
-    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25), tag=Tags.source_config):
-        # with dpg.tab_bar():
-        # with dpg.tab(label='Fields'):
+    with dpg.window(label=f'Configure {ds.file_name}', modal=True, autosize=True, pos=(200,25), tag=Tags.source_config): #TODO: make window position based on window size
         dpg.add_separator(label='Rename File')
         with dpg.group(horizontal=True):
-            file_alias_choice = dpg.add_input_text(label=ds.file_name,width=TEXT_BOX_WIDTH, default_value=ds.file_alias, no_spaces=True, callback=store_choices_callback)
+            choose_file_alias = dpg.add_input_text(label=ds.file_name,width=TEXT_BOX_WIDTH, default_value=ds.file_alias, no_spaces=True)
             dpg.add_spacer(width=25)
-            prepend_alias_choice = dpg.add_checkbox(label='Prepend', default_value=ds.is_prepended_alias, callback=store_choices_callback)
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text('Add File Alias to Column Alias in Plot Legend')
         dpg.add_separator(label='Set Source X-Axis')
         with dpg.group(horizontal=True):
-            x_axis_choice = dpg.add_combo(ds.col_headers, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.x_axis_header, callback=store_choices_callback) # choices are names, not aliases. this will return a name and it must be converted back to an alias
+            choose_x_axis_header = dpg.add_combo(ds.col_headers, label='Set X-Axis', width=TEXT_BOX_WIDTH, default_value=ds.x_axis_header)
             dpg.add_spacer(width=25)
-            datetime_choice = dpg.add_checkbox(label='DateTime?', default_value=False, callback=store_choices_callback) # TODO: change this to degault_option
-        with dpg.group(horizontal=True):
-            dpg.add_text('Scalar Operation')
-            operation_choice = dpg.add_combo(('None', 'Multiply', 'Divide'), default_value='None', width=80, callback=store_choices_callback) # TODO: change this to default_option
-            scalar_choice = dpg.add_input_float(step=0, step_fast=0, width=50,  format="%.1f", callback=store_choices_callback)
+            choose_datetime = dpg.add_checkbox(label='DateTime?', default_value=False) # FEATURE: change this to degault_option. DECIDE IF DATETIME needs to be selected here or if it should be done with date dropdown in config plot
         dpg.add_separator(label='Rename Columns')
         with dpg.child_window(height=COLUMN_RENAME_HEIGHT, border=False, auto_resize_x=True):
             for name in ds.col_headers:
                 alias = ds.get_alias_from_header(name)
-                dpg.add_input_text(label=name, default_value=alias, width=TEXT_BOX_WIDTH, no_spaces=True, auto_select_all=True, callback=renamed_columns_callback)
-            # with dpg.tab(label='Edit X-Axis'):
-            #     dpg.add_listbox(("AAAA", "BBBB", "CCCC", "DDDD"), label='ALTERNATE X-AXIS SOURCE')
-            #     dpg.add_checkbox(label='Re-base axis')
-            #     dpg.add_text('scalar')
-            #     dpg.add_text('time')
-            #     dpg.add_text('UTC offset')
+                tag = Tags.generate()
+                renamed_aliases.append(tag)
+                dpg.add_input_text(label=name, default_value=alias, width=TEXT_BOX_WIDTH, no_spaces=True, auto_select_all=True, tag=tag)
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Cancel", callback=delete_config_window)
-            dpg.add_button(label="OK", callback=save_config_choices_callback)
-            duplicate_error = dpg.add_text('NO DUPLICATE ALIAS ALLOWED', show=False) # TODO: make this not resize the window when it pops up. Unfortunately popups over modal does not seem possible
-            dpg.bind_item_theme(dpg.last_item(), red_text_theme)
-            dpg.add_spacer(width=170)
-            dpg.add_button(label="Delete Series", callback=delete_data_callback)
-            dpg.bind_item_theme(dpg.last_item(), delete_theme)
-
+            dpg.add_button(label="Cancel", callback=lambda: dpg.delete_item(Tags.source_config))
+            dpg.add_button(label="OK", callback=save_and_close)
+            duplicate_error = dpg.add_text(default_value='NO DUPLICATE ALIAS ALLOWED', show=False) # BUG: make this not resize the window when it pops up. Unfortunately popups over modal does not seem possible
+            dpg.bind_item_theme(dpg.last_item(), Themes.red_text)
+            dpg.add_spacer(width=190)
+            dpg.add_button(label="DELETE DATA", callback=remove_data_from_sources)
+            dpg.bind_item_theme(dpg.last_item(), Themes.red_button)

@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 from dearpygui.dearpygui import show_item, drag_payload
 
-from data_instance import create_data_manager_items # todo: consider not importing this and access it thru dot operator instead
+from data_instance import populate_data_manager # todo: consider not importing this and access it thru dot operator instead
 
 from tags import Tags
 from data_instance import DataInstance
-from utils import data
+from utils import sources
 
 INPUT_WINDOW_WIDTH = 150
 DATA_WINDOW_WIDTH = 350
@@ -52,7 +52,7 @@ def auto_populate_column_name(sender, app_data, user_data):
 def push_new_column(ds, out_name, out_alias):
     dpg.configure_item(output_draggable, label=out_alias, show=True)
     dpg.add_drag_payload(label=ds.get_prepended_alias(out_alias), parent=output_draggable,drag_data=ds.get_drag_payload_data(out_name))
-    create_data_manager_items(ds) # required to update ds manager appropriately
+    populate_data_manager(ds) # required to update ds manager appropriately
 
 
 def populate_scalar():
@@ -202,6 +202,7 @@ def compute_histogram():
     ds.add_new_column(output_data,out_name,None) # required to update ds instnace appropriately
     out_alias = ds.get_alias_from_header(out_name)
 
+    # TODO: CHANGE THIS TO NEW COLUMNPARAMS CLASS. May need to import above
     ds.set_extra_drag_payload_params(out_name,{'histogram_bins':n_bins,'axis_style':'Histogram'})
 
     push_new_column(ds, out_name, out_alias)

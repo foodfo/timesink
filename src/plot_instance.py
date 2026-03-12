@@ -5,7 +5,9 @@ from tkinter import Label
 import dearpygui.dearpygui as dpg
 import pandas as pd
 import numpy as np
-from utils import plots, data
+
+from src.data_instance import DragItemType, DragPayloadColumn
+from utils import plots, sources
 from utils import * # REFACTOR: temporary until I manage Globals better
 from tags import Tags
 from typing import Dict
@@ -259,23 +261,33 @@ class SeriesInstance:
         pass
 
     @classmethod
-    def create_object(cls, ds, drag_data, global_style, parent_axis_tag): # make series instance WAY easier to set up
+    def create_object(cls, ds, drag_data: DragPayloadColumn, global_style, parent_axis_tag): # make series instance WAY easier to set up
         parent_axis_tag = parent_axis_tag
-        data_instance_tag = drag_data['instance_tag']
-        col_name = drag_data['col_name']
-        params = drag_data['extra_params']  # TODO: decide if/how to implement params. setting new x axis with FFT will cuase issues when we call get_prepended_alias. maybe guard this get fn to just pass any results not in the source
+        # data_instance_tag = drag_data['instance_tag']
+        data_instance_tag = ds.instance_tag
+        col_name = drag_data.col_header_to_plot
+        # col_name = drag_data['col_name']
+        # params = drag_data['extra_params']  # TODO: decide if/how to implement params. setting new x axis with FFT will cuase issues when we call get_prepended_alias. maybe guard this get fn to just pass any results not in the source
+        params = drag_data.params
 
-        source_x_axis_name = params.get('alt_x_axis') or ds.x_axis_header
-        style = params.get('axis_style') or global_style
-        h_bins = params.get('histogram_bins') or 10
-        fft_mag = params.get('FFT_magnitudes_arr')  or None
-        fft_freq = params.get('FFT_frequencies_arr') or None
+        # source_x_axis_name = params.get('alt_x_axis') or ds.x_axis_header
+        # style = params.get('axis_style') or global_style
+        # h_bins = params.get('histogram_bins') or 10
+        # fft_mag = params.get('FFT_magnitudes_arr')  or None
+        # fft_freq = params.get('FFT_frequencies_arr') or None
+
+        source_x_axis_name = params.alt_x_axis or ds.x_axis_header
+        style = params.axis_style or global_style
+        h_bins = params.histogram_bins or 10
+        fft_mag = params.fft_magnitudes_arr or None
+        fft_freq = params.fft_frequencies_arr or None
 
         y_name, y_alias, y_df = ds.get_column(col_name)
         x_name, x_alias, x_df = ds.get_column(source_x_axis_name)
 
-        y_alias = ds.get_prepended_alias(y_alias)
-        x_alias = ds.get_prepended_alias(x_alias)
+        # y_alias = ds.get_prepended_alias(y_alias)
+        # x_alias = ds.get_prepended_alias(x_alias)
+
 
         sr_instance_tag = dpg.generate_uuid()  # used in series_list dict
         mvseries_tag = dpg.generate_uuid()  # the dpg tag for the actual lines on the graph
@@ -299,19 +311,18 @@ class SeriesInstance:
 
 
 def calculate_plot_height():
-    num_plots = max(1, min(len(plots), MAX_PLOTS_ON_SCREEN)) # protect divide by zero and clamp to maximum plots set in "options"
+    num_plots = max(1, min(len(plots._items), MAX_PLOTS_ON_SCREEN)) # protect divide by zero and clamp to maximum plots set in "options"
     # TODO: make config and button in options set the max plots on screen. changing this should also trigger the callback to update all plot sizes
     return int((dpg.get_viewport_client_height()-TAB_BAR_HEIGHT) / num_plots)
 
 def set_all_plot_heights():
-    for instance_tag in plots.keys():
-        dpg.set_item_height(plots[instance_tag].graph_tag, calculate_plot_height())
-
+    for instance_tag in plots._items.keys():
+        dpg.set_item_height(plots.get(instance_tag).graph_tag, calculate_plot_height())
 # ---------- Helper Functions ----------
 
 def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data):
-    pi = plots[plot_instance_tag]
-    ds: DataInstance = data[data_instance_tag]
+    pi = plots.get(plot_instance_tag)
+    ds = sources.get(data_instance_tag)
     sr = SeriesInstance.create_object(ds, drag_data, pi.global_style, parent_axis_tag)
     pi.add_series(sr.instance_tag, sr)  # TODO: once again, could direct access
     pi.draw_series(sr.instance_tag, sr.style, sr.parent_axis_tag)
@@ -331,12 +342,20 @@ def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data
     #                         # TODO: what happens if you only do one axis?
 
 def drop_item_on_plot_handler(sender, app_data, user_data):
-    if app_data.get('draggable')=='Annotation':
+    # if app_data.get('draggable')=='Annotation':
+    #     add_annotation_to_plot(sender, app_data, user_data)
+    # elif app_data.get('draggable')=='Trim Window':
+    #     add_trim_window(sender, app_data, user_data)
+    # else:
+    #     add_series_to_plot_from_plot(sender, app_data, user_data)
+
+    if app_data.type == DragItemType.ANNOTATION:
         add_annotation_to_plot(sender, app_data, user_data)
-    elif app_data.get('draggable')=='Trim Window':
+    elif app_data.type == DragItemType.TRIM_WINDOW:
         add_trim_window(sender, app_data, user_data)
     else:
         add_series_to_plot_from_plot(sender, app_data, user_data)
+
 
     # TODO: instead of passing user_data genericly, consider passing: user_data=dpg.get_item_user_data(sender) to make it clearer we only care to pass the user data from the drop_callback - will need to change the logic in each function in the if statement
 
@@ -345,17 +364,17 @@ def add_series_to_plot_from_plot(sender, app_data, user_data):
 
     user_data = dpg.get_item_user_data(sender)
     plot_instance_tag = user_data
-    pi = plots[plot_instance_tag]
+    pi = plots.get(plot_instance_tag)
 
     # drag and drop to the plot will add to the first Y axis dpg.mvYAxis
     parent_axis_tag = next(tag for tag, ax in pi.axis_list.items() if ax.which_axis is dpg.mvYAxis)
-    data_instance_tag = app_data['instance_tag']
+    data_instance_tag = app_data.ds.instance_tag
     drag_data = app_data
 
     add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data)
 
 
-def add_series_to_plot_from_axis(sender, app_data, user_data):
+def add_series_to_plot_from_axis(sender, app_data: DragPayloadColumn, user_data):
 
     # add axis to current plot instance
     # 1. get data to add to PlotData
@@ -376,7 +395,7 @@ def add_series_to_plot_from_axis(sender, app_data, user_data):
 
     # 1.
     plot_instance_tag = user_data
-    data_instance_tag = app_data['instance_tag']
+    data_instance_tag = app_data.ds.instance_tag
     # col_name = app_data['col_name']
     # extra_params = app_data['extra_params']
     # params = {k:v for k,v in extra_params.items() if v is not None}
@@ -422,7 +441,7 @@ def add_series_to_plot_from_axis(sender, app_data, user_data):
 
 
 def get_plot_instance_number(instance_tag):
-    return list(plots.keys()).index(instance_tag) + 1 # 1 indexed rather than 0 indexed
+    return list(plots._items.keys()).index(instance_tag) + 1 # 1 indexed rather than 0 indexed
 
 # def rename_manager(sender, app_data, user_data):
 #     dropdown_selection = app_data
@@ -519,7 +538,7 @@ def add_new_plot_instance():
 
     pi = PlotInstance(instance_tag=plot_instance_tag, manager_tag=plot_manager_tag,graph_tag=plot_graph_tag, legend_tag=plot_legend_tag)
 
-    plots[pi.instance_tag] = pi
+    plots.add(pi)
 
     instance_number = get_plot_instance_number(pi.instance_tag)
 
