@@ -110,7 +110,7 @@ def populate_data_manager(ds: DataInstance) -> None:
         dpg.delete_item(ds.manager_tag,children_only=True)
 
     with dpg.group(parent=ds.manager_tag): # parent is the collapsing header window
-        dpg.add_button(label='Configure', callback=configure_data_window, user_data=ds)
+        # dpg.add_button(label='Configure', callback=configure_data_window, user_data=ds) # TODO: decide to keep or remove this. if remove consider cleanidng up the "right click" functions and rolling them into thier children
         dpg.add_text(default_value=f'X-Axis: {ds.get_alias_from_header(ds.x_axis_header)}', drop_callback=quick_set_x_axis, user_data=ds)
         dpg.add_separator()
         with dpg.child_window(height=130, resizable_y=True):
@@ -124,12 +124,30 @@ def populate_data_manager(ds: DataInstance) -> None:
 
 def add_data_to_sources(_, app_data: Dict[str,str]) -> None:
     ds = DataInstance(file_path=app_data['file_path_name'])
-    sources.add(ds) # REFACTOR: fix this when turning data into a class (app.data?)
+    sources.add(ds)
 
     with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=Tags.data_manager_tab):
-        dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header)
+        dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header) # TODO: check this I believe it is the DEFAULT theme. consider renaming it for clarity
+        # BUG: for some reason the first time the popup is triggered, it renders at screen loc 0,0. I had minimal luck fixing it
+        with dpg.popup(dpg.last_item(),min_size=(50,50)):
+            dpg.add_selectable(label="Settings", callback=right_click_configure, user_data=ds)
+            dpg.add_spacer(height=2)
+            dpg.add_separator()
+            dpg.add_spacer(height=2)  # add space so you don't accidentally hit delete
+            dpg.add_selectable(label='Delete', callback=right_click_delete, user_data=ds)
+            dpg.bind_item_theme(dpg.last_item(), Themes.red_selectable)
 
     populate_data_manager(ds)
+
+
+def right_click_configure(sender, app_data, user_data: DataInstance) -> None:
+    dpg.set_value(sender, False)
+    configure_data_window(None, None, user_data)
+
+def right_click_delete(sender, app_data, user_data: DataInstance) -> None:
+    # dpg.set_value(sender, False)
+    sources.delete(user_data)
+
 
 def configure_data_window(_, __, user_data: DataInstance) -> None:
 
@@ -190,6 +208,7 @@ def configure_data_window(_, __, user_data: DataInstance) -> None:
             dpg.add_button(label="OK", callback=save_and_close)
             duplicate_error = dpg.add_text(default_value='NO DUPLICATE ALIAS ALLOWED', show=False) # BUG: make this not resize the window when it pops up. Unfortunately popups over modal does not seem possible
             dpg.bind_item_theme(dpg.last_item(), Themes.red_text)
-            dpg.add_spacer(width=190)
-            dpg.add_button(label="DELETE DATA", callback=remove_data_from_sources)
-            dpg.bind_item_theme(dpg.last_item(), Themes.red_button)
+            # TODO: decide to keep or remove this. if remove consider cleanidng up the "right click" functions and rolling them into thier children
+            # dpg.add_spacer(width=190)
+            # dpg.add_button(label="DELETE DATA", callback=remove_data_from_sources)
+            # dpg.bind_item_theme(dpg.last_item(), Themes.red_button)

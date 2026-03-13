@@ -7,7 +7,7 @@ import numpy as np
 import data_instance # TODO: collapse this to preserve namespace
 import plot_instance
 from data_instance import DataInstance, add_data_to_sources
-from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_instance, set_all_plot_heights
+from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_instance, set_all_plot_heights, change_num_visible_plots
 from utils import sources, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 from utils import * # TODO: temporary until I manage Globals better
 from tags import Tags
@@ -98,7 +98,7 @@ def show_file_dialog(sender, app_data, user_data):
 
 
 # main window with menu bar and tab instance containers
-with dpg.window(tag=Tags.mainwin):
+with dpg.window(tag=Tags.main_window):
     with dpg.menu_bar(show=False):
         with dpg.menu(label="File",): # not sure what to put here
             pass
@@ -153,7 +153,7 @@ with dpg.theme() as blue_header_theme: # TEAL THEME
 
 # everything that sits in a single tab instance
 # with dpg.child_window(parent=Tags.primary_tab, border=False):
-with dpg.child_window(parent=Tags.mainwin, border=False):
+with dpg.child_window(parent=Tags.main_window, border=False):
     # dpg.add_spacer(height = 5)
     with dpg.group(horizontal=True):
             # with dpg.child_window(label="Options",autosize_x=True, auto_resize_y=True, tag=Tags.options_window):
@@ -189,7 +189,13 @@ with dpg.child_window(parent=Tags.mainwin, border=False):
                 with dpg.child_window(auto_resize_y=True, tag=Tags.plot_manager_tab):
                     # with dpg.tab(label='PLOTS', tag=Tags.plot_manager_tab):
 
-                    dpg.add_button(label="ADD PLOT", callback=add_new_plot_instance) # TODO: make add plot and add data centered on column
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(label="ADD PLOT", callback=add_new_plot_instance) # TODO: make add plot and add data centered on column
+                        dpg.add_input_int(default_value=MAX_PLOTS_ON_SCREEN, callback=change_num_visible_plots, width=65, min_value=1,max_value=10, min_clamped=True, max_clamped=True)
+                        with dpg.tooltip(parent=dpg.last_item(), delay=.01):
+                            dpg.add_text('Max Visible Plots')
+
+
                     # with dpg.group(horizontal=True):
                     #     dpg.add_button(label="- Plot", callback=delete_last_plot_instance) # TODO: add right click button to quicklly delete plots and ddata
                     #     dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
@@ -199,7 +205,8 @@ with dpg.child_window(parent=Tags.mainwin, border=False):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag = Tags.data_manager_tab):
                     # dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog"), user_data=dpg.last_item())
-                    dpg.add_button(label="ADD DATA", callback=show_file_dialog, user_data=dpg.last_container())
+                    dpg.add_button(label="IMPORT DATA", callback=show_file_dialog, user_data=dpg.last_container())
+
                     dpg.add_separator()
                     dpg.add_spacer(height=10)
                     # with dpg.group(tag = Tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
@@ -336,6 +343,6 @@ add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downl
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
 dpg.show_item_registry()
-dpg.set_primary_window(Tags.mainwin, True)
+dpg.set_primary_window(Tags.main_window, True)
 dpg.start_dearpygui()
 dpg.destroy_context()

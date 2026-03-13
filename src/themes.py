@@ -5,6 +5,7 @@ class Themes:
     red_button = None
     blue_button = None
     red_text = None
+    red_selectable = None
 
     @classmethod
     def init_themes(cls):
@@ -34,11 +35,18 @@ class Themes:
                 # dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
                 # dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4)
 
+        with dpg.theme() as red_selectable_theme:
+            with dpg.theme_component(dpg.mvSelectable):
+                dpg.add_theme_color(dpg.mvThemeCol_Header, (180, 60, 60))  # neutral red
+                dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (200, 80, 80))  # lighter red
+                dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (160, 40, 40))  # darker red
+
         # THEME ASSIGNMENT MAPPING
         cls.collapsing_header = blue_dropdown
         # cls.collapsing_header = black_sub_dropdown
         cls.red_button = delete_theme
         cls.red_text = red_text_theme
+        cls.red_selectable = red_selectable_theme
 
 
 

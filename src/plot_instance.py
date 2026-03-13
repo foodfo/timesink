@@ -311,13 +311,23 @@ class SeriesInstance:
 
 
 def calculate_plot_height():
-    num_plots = max(1, min(len(plots._items), MAX_PLOTS_ON_SCREEN)) # protect divide by zero and clamp to maximum plots set in "options"
+    import utils # REFACTOR: change how this is handled
+    num_plots = max(1, min(len(plots._items), utils.MAX_PLOTS_ON_SCREEN)) # protect divide by zero and clamp to maximum plots set in "options"
     # TODO: make config and button in options set the max plots on screen. changing this should also trigger the callback to update all plot sizes
     return int((dpg.get_viewport_client_height()-TAB_BAR_HEIGHT) / num_plots)
 
 def set_all_plot_heights():
     for instance_tag in plots._items.keys():
         dpg.set_item_height(plots.get(instance_tag).graph_tag, calculate_plot_height())
+
+def change_num_visible_plots(sender, app_data, user_data) -> None:
+    # REFACTOR: definitely change how this is done later. max plots on screen should be a user configurable option
+    import utils
+    utils.MAX_PLOTS_ON_SCREEN = dpg.get_value(sender)
+    print(utils.MAX_PLOTS_ON_SCREEN)
+    set_all_plot_heights()
+
+
 # ---------- Helper Functions ----------
 
 def add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data):
