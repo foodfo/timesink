@@ -1,10 +1,5 @@
-from multiprocessing.process import parent_process
-from pyexpat import features
-from tkinter import Label
-
 import dearpygui.dearpygui as dpg
 import pandas as pd
-import numpy as np
 
 from src.data_instance import DragItemType, DragPayloadColumn
 from utils import plots, sources
@@ -12,10 +7,33 @@ from utils import * # REFACTOR: temporary until I manage Globals better
 from tags import Tags
 from typing import Dict
 from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
-
 from dataclasses import dataclass
 
+class PlotInstance:
+    def __init__(self):
+        self.instance_tag = Tags.generate()
+        self.manager_tag = Tags.generate() # TODO: should probably be button_tag
+        self.content_tag = Tags.generate()
+        self.graph_tag = Tags.generate() # TODO: maybe rename graph_tag
+        self.legend_tag = Tags.generate()
 
+
+        self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
+        self.trim_list: Dict[int, TrimWindow] = {}
+
+        self.plot_name = None
+        self.plot_name_visible = False
+        # OR THIS
+        self.plot_properties = PlotProperties(name = None, name_visible = False)
+
+
+    def _init_axis_list(self) -> Dict[int, 'AxisInstance']:
+        pass
+
+@dataclass()
+class PlotProperties:
+    name: str
+    name_visible = bool
 
 
 class PlotInstance:
@@ -141,7 +159,7 @@ class PlotInstance:
     def delete(self):
         dpg.delete_item(self.graph_tag)
         dpg.delete_item(self.manager_tag)
-        plots.pop(self.instance_tag) # REFACTOR: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
+        plots.delete(self) # REFACTOR: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
 
     def clear_contents(self): # flush all contents from PI
         dpg.delete_item(self.graph_tag, children_only=True)

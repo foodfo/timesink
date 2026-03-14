@@ -201,17 +201,15 @@ with dpg.child_window(parent=Tags.main_window, border=False):
                     #     dpg.add_button(label="+ Plot", callback=add_new_plot_instance)
                     dpg.add_separator()
                 dpg.add_spacer(height=10)
+
             with dpg.collapsing_header(label='DATA', default_open=True):
                 dpg.bind_item_theme(dpg.last_item(), blue_header_theme)
                 with dpg.child_window(auto_resize_y=True, tag = Tags.data_manager_tab):
                     # dpg.add_button(label="ADD DATA", callback=lambda: dpg.show_item("file_dialog"), user_data=dpg.last_item())
                     dpg.add_button(label="IMPORT DATA", callback=show_file_dialog, user_data=dpg.last_container())
-
                     dpg.add_separator()
-                    dpg.add_spacer(height=10)
-                    # with dpg.group(tag = Tags.data_manager_tab): # put it in a group so we can clear all the custom styles for dropdowns # TODO: this doesnt work
-                    #     # dpg.bind_item_theme(Tags.data_manager_tab, neutral_theme)
-                    #     pass
+                    dpg.add_spacer(height=3) # TODO: decide to keep or delete the spacer
+
 
             # this is the actual plot area
         with dpg.child_window(autosize_x=True, autosize_y=True, border=False, tag=Tags.plot_window):
@@ -335,14 +333,14 @@ with dpg.window(label='Import Configurator', width=500, height=700, modal=True, 
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(Tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'}, Tags.data_manager_tab)
-# add_new_data_instance(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'}, Tags.data_manager_tab)
+# add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
+# add_data_to_sources(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'})
+add_data_to_sources(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'})
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)
 # dpg.show_style_editor()
-# dpg.show_item_registry()
+dpg.show_item_registry()
 dpg.set_primary_window(Tags.main_window, True)
 dpg.start_dearpygui()
 dpg.destroy_context()

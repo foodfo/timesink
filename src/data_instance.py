@@ -29,6 +29,7 @@ class DataInstance:
         self.file_alias = self.file_name # initialize them the same
         self.instance_tag = Tags.generate()
         self.manager_tag = Tags.generate()
+        self.content_tag = Tags.generate() # TODO: this is a stub from changing from collapsible header to button. decide if it should exist
         self.df = self._create_dataframe(file_path, quick_format_options)
         self.x_axis_header = self.df.columns[0]
         self._header_to_alias: Dict[str,str] = {header: header for header in self.df.columns}
@@ -45,6 +46,7 @@ class DataInstance:
 
     def delete(self) -> None:
         dpg.delete_item(self.manager_tag)
+        dpg.delete_item(self.content_tag)  #TODO: this is a stub from changing from collapsible header to button. decide if it should exist
 
     def get_alias_from_header(self, name) -> str:
         return self._header_to_alias[name]
@@ -106,14 +108,18 @@ def quick_set_x_axis(sender, app_data: DragPayloadColumn):
     populate_data_manager(ds) # TODO: seems a bit brute force to regenerate the entire data manager window, but this has the benefit of regenerating the config window during callback creation so it doesnt open empty after changes like with the line above. Previously just tried configureitemlabel
 
 def populate_data_manager(ds: DataInstance) -> None:
-    if dpg.does_item_exist(ds.manager_tag):
-        dpg.delete_item(ds.manager_tag,children_only=True)
+    # if dpg.does_item_exist(ds.manager_tag): #TODO: this is a stub from changing from collapsible header to button. decide if it should exist
+    #     dpg.delete_item(ds.manager_tag,children_only=True)
 
-    with dpg.group(parent=ds.manager_tag): # parent is the collapsing header window
+    if dpg.does_item_exist(ds.content_tag):
+        dpg.delete_item(ds.content_tag, children_only=True)
+
+    with dpg.child_window(parent=Tags.data_manager_tab, tag=ds.content_tag, show=True, border=False, auto_resize_y=True, autosize_y=True): #TODO: this is a stub from changing from collapsible header to button. decide if it should exist
+    # with dpg.group(parent=ds.manager_tag): # parent is the collapsing header window
         # dpg.add_button(label='Configure', callback=configure_data_window, user_data=ds) # TODO: decide to keep or remove this. if remove consider cleanidng up the "right click" functions and rolling them into thier children
         dpg.add_text(default_value=f'X-Axis: {ds.get_alias_from_header(ds.x_axis_header)}', drop_callback=quick_set_x_axis, user_data=ds)
         dpg.add_separator()
-        with dpg.child_window(height=130, resizable_y=True):
+        with dpg.child_window(height=130, resizable_y=True, border=False):
             for header in ds.col_headers:  # keys are aliases, cols are df headers
                 alias = ds.get_alias_from_header(header)
                 dpg.add_button(label=alias)
@@ -126,28 +132,30 @@ def add_data_to_sources(_, app_data: Dict[str,str]) -> None:
     ds = DataInstance(file_path=app_data['file_path_name'])
     sources.add(ds)
 
-    with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=Tags.data_manager_tab):
-        dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header) # TODO: check this I believe it is the DEFAULT theme. consider renaming it for clarity
-        # BUG: for some reason the first time the popup is triggered, it renders at screen loc 0,0. I had minimal luck fixing it
-        with dpg.popup(dpg.last_item(),min_size=(50,50)):
-            dpg.add_selectable(label="Settings", callback=right_click_configure, user_data=ds)
-            dpg.add_spacer(height=2)
-            dpg.add_separator()
-            dpg.add_spacer(height=2)  # add space so you don't accidentally hit delete
-            dpg.add_selectable(label='Delete', callback=right_click_delete, user_data=ds)
-            dpg.bind_item_theme(dpg.last_item(), Themes.red_selectable)
+    # with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=Tags.data_manager_tab):
+    #     dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header) # TODO: check this I believe it is the DEFAULT theme. consider renaming it for clarity
+    dpg.add_button(label=ds.file_alias, tag=ds.manager_tag, parent=Tags.data_manager_tab, width=-1, callback=toggle_content_visibility_callback, user_data=ds)
+    # BUG: for some reason the first time the popup is triggered, it renders at screen loc 0,0. I had minimal luck fixing it. it appears this is only a bug when loading in data very early. when its called in timesink directly
+    with dpg.popup(dpg.last_item(),min_size=(50,50)):
+        dpg.add_selectable(label="Edit", callback=right_click_configure, user_data=ds)
+        dpg.add_spacer(height=2)
+        dpg.add_separator()
+        dpg.add_spacer(height=2)  # add space so you don't accidentally hit delete
+        dpg.add_selectable(label='Delete', callback=right_click_delete, user_data=ds)
+        dpg.bind_item_theme(dpg.last_item(), Themes.red_selectable)
 
     populate_data_manager(ds)
 
+def toggle_content_visibility_callback(sender, app_data, user_data: DataInstance) -> None:
+    ds = user_data
+    dpg.hide_item(ds.content_tag) if dpg.is_item_shown(ds.content_tag) else dpg.show_item(ds.content_tag)
 
 def right_click_configure(sender, app_data, user_data: DataInstance) -> None:
     dpg.set_value(sender, False)
     configure_data_window(None, None, user_data)
 
 def right_click_delete(sender, app_data, user_data: DataInstance) -> None:
-    # dpg.set_value(sender, False)
     sources.delete(user_data)
-
 
 def configure_data_window(_, __, user_data: DataInstance) -> None:
 
