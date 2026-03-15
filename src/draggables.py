@@ -60,7 +60,7 @@ class TrimWindow:
 
         color = cls.set_color(window_number)
 
-        parent_tag = pi.graph_tag
+        parent_tag = pi.plot_tag
 
         return cls(
             instance_tag = instance_tag,
@@ -133,13 +133,13 @@ def add_annotation_to_plot(sender, app_data, user_data):
 
     # TODO: add a cancel button that works. maybe an X next to the text box
     with dpg.window(label='Annotation', modal=True, autosize=True, pos=mouse_screen_coords, no_title_bar=True):
-        dpg.add_input_text(default_value='Text Here', auto_select_all=True, width=150, on_enter=True, tag=txt, callback=add_annotation, user_data=[txt,mouse_coords, pi.graph_tag, offset])
+        dpg.add_input_text(default_value='Text Here', auto_select_all=True, width=150, on_enter=True, tag=txt, callback=add_annotation, user_data=[txt, mouse_coords, pi.plot_tag, offset])
         dpg.focus_item(txt)
 
         with dpg.group(horizontal=True):
             dpg.add_radio_button(('TR','BR','BL','TL'), horizontal=True, default_value='TR', tag=offset)
 
-        user_data = [txt, mouse_coords, pi.graph_tag, offset]
+        user_data = [txt, mouse_coords, pi.plot_tag, offset]
 
         with dpg.group(horizontal=True):
             dpg.add_button(label='Yellow', user_data=user_data, callback=add_annotation, tag=default_color) # TODO: default color didnt seem to work? kept going black so had to add else clause

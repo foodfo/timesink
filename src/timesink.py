@@ -7,7 +7,7 @@ import numpy as np
 import data_instance # TODO: collapse this to preserve namespace
 import plot_instance
 from data_instance import DataInstance, add_data_to_sources
-from plot_instance import PlotInstance, delete_last_plot_instance, add_new_plot_instance, set_all_plot_heights, change_num_visible_plots
+from plot_instance import PlotInstance, add_new_plot_instance, set_all_plot_heights, change_num_visible_plots
 from utils import sources, plots # TODO: see if theres a better way to store data and plots. Should they be classeS?
 from utils import * # TODO: temporary until I manage Globals better
 from tags import Tags
@@ -333,9 +333,9 @@ with dpg.window(label='Import Configurator', width=500, height=700, modal=True, 
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(Tags.import_config))
         dpg.add_button(label="Cancel")
 
-# add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
+add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
 # add_data_to_sources(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'})
-add_data_to_sources(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'})
+# add_data_to_sources(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'})
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)

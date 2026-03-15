@@ -27,8 +27,8 @@ class DataInstance:
 
         self.file_name = Path(file_path).stem
         self.file_alias = self.file_name # initialize them the same
-        self.instance_tag = Tags.generate()
-        self.manager_tag = Tags.generate()
+        self.self_tag = Tags.generate()
+        self.button_tag = Tags.generate()
         self.content_tag = Tags.generate() # TODO: this is a stub from changing from collapsible header to button. decide if it should exist
         self.df = self._create_dataframe(file_path, quick_format_options)
         self.x_axis_header = self.df.columns[0]
@@ -45,7 +45,7 @@ class DataInstance:
         return tuple(self._header_to_alias.values())
 
     def delete(self) -> None:
-        dpg.delete_item(self.manager_tag)
+        dpg.delete_item(self.button_tag)
         dpg.delete_item(self.content_tag)  #TODO: this is a stub from changing from collapsible header to button. decide if it should exist
 
     def get_alias_from_header(self, name) -> str:
@@ -134,7 +134,7 @@ def add_data_to_sources(_, app_data: Dict[str,str]) -> None:
 
     # with dpg.collapsing_header(label=ds.file_alias, default_open=True, tag=ds.manager_tag, parent=Tags.data_manager_tab):
     #     dpg.bind_item_theme(dpg.last_item(), Themes.collapsing_header) # TODO: check this I believe it is the DEFAULT theme. consider renaming it for clarity
-    dpg.add_button(label=ds.file_alias, tag=ds.manager_tag, parent=Tags.data_manager_tab, width=-1, callback=toggle_content_visibility_callback, user_data=ds)
+    dpg.add_button(label=ds.file_alias, tag=ds.button_tag, parent=Tags.data_manager_tab, width=-1, callback=toggle_content_visibility_callback, user_data=ds)
     # BUG: for some reason the first time the popup is triggered, it renders at screen loc 0,0. I had minimal luck fixing it. it appears this is only a bug when loading in data very early. when its called in timesink directly
     with dpg.popup(dpg.last_item(),min_size=(50,50)):
         dpg.add_selectable(label="Edit", callback=right_click_configure, user_data=ds)
@@ -176,7 +176,7 @@ def configure_data_window(_, __, user_data: DataInstance) -> None:
         new_alias = dpg.get_value(choose_file_alias)
         if new_alias:
             ds.set_file_alias(new_alias)
-            dpg.set_item_label(ds.manager_tag, new_alias)
+            dpg.set_item_label(ds.button_tag, new_alias)
 
         for tag in renamed_aliases:
             col_alias = dpg.get_value(tag)

@@ -26,6 +26,9 @@ class DragItemType(Enum):
     ANNOTATION = 2
     TRIM_WINDOW = 3
 
+
+
+
 class Sources:
     def __init__(self) -> None:
         self._items: Dict[int,'DataInstance'] = {} # key = UUID tag, value = DataSource
@@ -35,14 +38,14 @@ class Sources:
         return set(self._items.keys())
 
     def add(self, ds: 'DataInstance') -> None:
-        self._items[ds.instance_tag] = ds
+        self._items[ds.self_tag] = ds
 
     def get(self, instance_tag: int) -> 'DataInstance | None':
         return self._items.get(instance_tag, None)
 
     def delete(self, ds: 'DataInstance') -> None:
         ds.delete()
-        self._items.pop(ds.instance_tag, None)
+        self._items.pop(ds.self_tag, None)
 
 class Plots:
     def __init__(self) -> None:
@@ -57,14 +60,14 @@ class Plots:
         return set(self._items.keys())
 
     def add(self, pi: 'PlotInstance') -> None:
-        self._items[pi.instance_tag] = pi
+        self._items[pi.self_tag] = pi
 
     def get(self, instance_tag: int) -> 'PlotInstance | None':
         return self._items.get(instance_tag, None)
 
     def delete(self, pi: 'PlotInstance') -> None:
         pi.delete()
-        self._items.pop(pi.instance_tag, None)
+        self._items.pop(pi.self_tag, None)
 
 # instantiate "singletons"
 sources = Sources()

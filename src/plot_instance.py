@@ -1,5 +1,6 @@
 import dearpygui.dearpygui as dpg
 import pandas as pd
+from enum import Enum
 
 from src.data_instance import DragItemType, DragPayloadColumn
 from utils import plots, sources
@@ -9,39 +10,75 @@ from typing import Dict
 from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
 from dataclasses import dataclass
 
+
+
+@dataclass()
+class PlotProperties:
+    name: str
+    name_visible: bool
+
+@dataclass()
+class AxisDefaults:
+    dpg_axis_type: int
+    show: bool
+    render_opposite_side: bool
+
+class AxisType(Enum):
+    X1 = AxisDefaults(dpg_axis_type = dpg.mvXAxis, show = True, render_opposite_side = False)
+    X2 = AxisDefaults(dpg_axis_type = dpg.mvXAxis2, show = False, render_opposite_side = False)
+    # X3 = AxisDefaults(dpg_axis_type = dpg.mvXAxis, show = True, render_opposite_side = False) # possible to enable a 3rd x-axis, but it's very hard to track ownership
+    Y1 = AxisDefaults(dpg_axis_type = dpg.mvYAxis, show = True, render_opposite_side = False)
+    Y2 = AxisDefaults(dpg_axis_type = dpg.mvXAxis2, show = True, render_opposite_side = True)
+    Y3 = AxisDefaults(dpg_axis_type = dpg.mvXAxis3, show = False, render_opposite_side = False)
+
+class AxisScale(Enum):
+    LINEAR = dpg.mvPlotScale_Linear
+    LOG = dpg.mvPlotScale_Log10
+    DATE = dpg.mvPlotScale_Time
+#
 class PlotInstance:
     def __init__(self):
-        self.instance_tag = Tags.generate()
-        self.manager_tag = Tags.generate() # TODO: should probably be button_tag
+        self.self_tag = Tags.generate()
+        self.button_tag = Tags.generate()
         self.content_tag = Tags.generate()
-        self.graph_tag = Tags.generate() # TODO: maybe rename graph_tag
+        self.plot_tag = Tags.generate()
         self.legend_tag = Tags.generate()
 
-
         self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
+        self.series_list: Dict[int, SeriesInstance] = {}
         self.trim_list: Dict[int, TrimWindow] = {}
 
         self.plot_name = None
         self.plot_name_visible = False
         # OR THIS
-        self.plot_properties = PlotProperties(name = None, name_visible = False)
-
+        self.plot_properties = PlotProperties(name = '', name_visible = False)
 
     def _init_axis_list(self) -> Dict[int, 'AxisInstance']:
-        pass
+        axis_list = {}
+        for axis_type in AxisType:
+            ax = AxisInstance(axis_type=axis_type, plot_tag=self.plot_tag)
+            axis_list.update({ax.self_tag: ax})
+        return axis_list
 
-@dataclass()
-class PlotProperties:
-    name: str
-    name_visible = bool
+
+class AxisInstance:
+    def __init__(self, axis_type, plot_tag) -> None:
+        self.self_tag = Tags.generate()
+        self.plot_tag = plot_tag
+
+        self.axis_type = axis_type
+        self.dpg_axis_type = axis_type.value.dpg_axis_type
+        self.show = axis_type.value.show
+        self.render_opposite_side = axis_type.value.render_opposite_side
+
 
 
 class PlotInstance:
 
-    def __init__(self,instance_tag, manager_tag,graph_tag, legend_tag):
-        self.instance_tag = instance_tag
-        self.manager_tag = manager_tag
-        self.graph_tag = graph_tag
+    def __init__(self,self_tag, manager_tag,graph_tag, legend_tag):
+        self.self_tag = self_tag
+        self.button_tag = manager_tag
+        self.plot_tag = graph_tag
         self.legend_tag = legend_tag
         self.series_list: Dict[int, SeriesInstance] = {}
         self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
@@ -51,41 +88,23 @@ class PlotInstance:
         self.y_axis_tags = [dpg.generate_uuid(), dpg.generate_uuid(), dpg.generate_uuid()]
         self.plot_name = None # gets init just after creation after getting index
         self.plot_options = self._init_plot_options()
-        self.axis_options = self._init_axis_options()
         self.plot_name_visible = False
-
-    # REFACTOR: decide if these shallow methods are better than direct access
-    # def set_graph_tag(self, tag):
-    #     self.graph_tag = tag
-    #
-    # def set_manager_tag(self, tag):
-    #     self.manager_tag = tag
-
-    # def set_global_style(self, style: str) -> None:
-    #     self.global_style = style
 
     def _init_axis_list(self):
         # default_axes = {'Y Axis 1': [dpg.mvYAxis, True,False], 'Y Axis 2': [dpg.mvYAxis2, True,True], 'Y Axis 3': [dpg.mvYAxis3, True,True], 'X Axis 1': [dpg.mvXAxis, True,False], 'X Axis 2': [dpg.mvXAxis2, True,True]} # TODO: tidy this up and consider making it a global config
         default_axes = {'X1': [dpg.mvXAxis, True,False],'Y1': [dpg.mvYAxis, True,False],'Y2': [dpg.mvYAxis2, True,True], 'Y3': [dpg.mvYAxis3, False,True],  'X2': [dpg.mvXAxis2, False,False]} # TODO: tidy this up and consider making it a global config
         # default_axes = {'X1': [dpg.mvXAxis, True,False],'Y1': [dpg.mvYAxis, True,False]}
 
-
         axis_list = {}
         for button_name, vars in default_axes.items():
             instance_tag = dpg.generate_uuid()
             alias = ''
             no_label = True
-            ax = AxisInstance(instance_tag=instance_tag, graph_tag=self.graph_tag, button_name=button_name, show=vars[1], which_axis=vars[0], alias=alias, no_label=no_label, location=vars[2])
+            ax = AxisInstance(instance_tag=instance_tag, graph_tag=self.plot_tag, button_name=button_name, show=vars[1], which_axis=vars[0], alias=alias, no_label=no_label, location=vars[2])
 
             axis_list[instance_tag] = ax
         return axis_list
 
-
-    def get_plot_name(self):
-        if self.plot_options['show_plot_name']:
-            return self.plot_name
-        else:
-            return ''
 
     def _init_plot_options(self):
         options = {
@@ -94,20 +113,6 @@ class PlotInstance:
             'highlight_axis_on_hover':False,
         }
         return options
-
-    def _init_axis_options(self):
-        options = {
-            'show_plot_name':False,
-            'show_legend': True,
-            'highlight_axis_on_hover':False,
-        }
-        return options
-
-    def set_style(self, sr_tag: int, style: str) -> None:
-        self.series_list[sr_tag].style = style # TODO: consider whether or not this should have a dedicated accessor or just modify it directly
-
-    def get_style(self, sr_tag):
-        return self.series_list[sr_tag].style
 
     def add_series(self, sr_tag, series):
         self.series_list[sr_tag] = series
@@ -157,18 +162,18 @@ class PlotInstance:
             self.draw_series(sr_tag, style, target_axis_tag)
 
     def delete(self):
-        dpg.delete_item(self.graph_tag)
-        dpg.delete_item(self.manager_tag)
+        dpg.delete_item(self.plot_tag)
+        dpg.delete_item(self.button_tag)
         plots.delete(self) # REFACTOR: decide if delete is better inside class or outside. it needs to know about the contents of plots which seems like excessive scope
 
     def clear_contents(self): # flush all contents from PI
-        dpg.delete_item(self.graph_tag, children_only=True)
+        dpg.delete_item(self.plot_tag, children_only=True)
         # BUG: not fully implemented or tested. this probably leaves ghosts in the PlotInstance
 
 class AxisInstance:
     def __init__(self, instance_tag, graph_tag, button_name, show, which_axis, alias, no_label, location):
-        self.instance_tag = instance_tag
-        self.graph_tag = graph_tag
+        self.self_tag = instance_tag
+        self.plot_tag = graph_tag
         self.button_name = button_name
         self.show = show
         self.which_axis = which_axis
@@ -182,7 +187,7 @@ class AxisInstance:
 
     def hide_show_alias(self, app_data):
         alias_shown = not app_data
-        dpg.configure_item(self.instance_tag, no_label=alias_shown)
+        dpg.configure_item(self.self_tag, no_label=alias_shown)
         # self.alias_shown = app_data
         # alias = self.get_axis_alias()
         # dpg.set_item_label(self.instance_tag, alias)
@@ -192,50 +197,30 @@ class AxisInstance:
     def set_axis_visibility(self, show):
         self.show = show
         if self.show:
-            dpg.configure_item(self.instance_tag,show=True)
+            dpg.configure_item(self.self_tag, show=True)
         else:
-            dpg.configure_item(self.instance_tag,show=False)
+            dpg.configure_item(self.self_tag, show=False)
 
     def set_axis_enable(self, enable):
         if enable == False:
-            dpg.delete_item(self.instance_tag, children_only=True)
+            dpg.delete_item(self.self_tag, children_only=True)
             self.enabled = False
             self.set_axis_visibility(False)
         else:
             self.enabled = True
             self.set_axis_visibility(True)
 
-    def set_alias(self, alias): # shallow so we can use lambda callback
+    def set_alias(self, alias): # TODO: shallow so we can use lambda callback
         self.alias = alias
         self.no_label = True
-        dpg.configure_item(self.instance_tag, label=alias, no_label=False) # auto show label on edit
-        print(self.instance_tag)
+        dpg.configure_item(self.self_tag, label=alias, no_label=False) # auto show label on edit
+        print(self.self_tag)
 
     def set_scale(self, app_data):
         self.scale = app_data
         print(self.scale)
-        dpg.configure_item(self.instance_tag,scale=self.axis_scale_options[self.scale])
+        dpg.configure_item(self.self_tag, scale=self.axis_scale_options[self.scale])
 
-    def hide_axis(self, sender):
-        print('HIDDEN PRESSED')
-        dpg.set_value(sender,False)
-        dpg.configure_item(self.instance_tag,show=False)
-
-    def disable_axis(self, sender):
-        print('HIDDEN PRESSED')
-        dpg.set_value(sender,False)
-        # dpg.configure_item(self.instance_tag,show=False)
-        dpg.delete_item(self.instance_tag, children_only=True)
-
-    # def get_current_axis_scale(tag):
-    #     if not dpg.does_item_exist(tag):
-    #         return None
-    #     current_scale = dpg.get_item_configuration(tag)['scale']
-    #     return next((label for label, scale in axis_scale.items() if scale == current_scale),
-    #                 None)  # reverse dictionary lookup
-    #
-    # def set_axis_scale(sender, app_data, user_data):
-    #     dpg.configure_item(user_data['axis_tag'], scale=axis_scale[app_data])
 
 class SeriesInstance:
     def __init__(self,
@@ -272,17 +257,11 @@ class SeriesInstance:
         self.fft_mag = fft_mag # TODO: make sure this doenst need to be converted from a df
         self.fft_freq = fft_freq
 
-    def to_histogram(self):
-        pass
-
-    def to_fft(self):
-        pass
-
     @classmethod
     def create_object(cls, ds, drag_data: DragPayloadColumn, global_style, parent_axis_tag): # make series instance WAY easier to set up
         parent_axis_tag = parent_axis_tag
         # data_instance_tag = drag_data['instance_tag']
-        data_instance_tag = ds.instance_tag
+        data_instance_tag = ds.self_tag
         col_name = drag_data.col_header_to_plot
         # col_name = drag_data['col_name']
         # params = drag_data['extra_params']  # TODO: decide if/how to implement params. setting new x axis with FFT will cuase issues when we call get_prepended_alias. maybe guard this get fn to just pass any results not in the source
@@ -336,7 +315,7 @@ def calculate_plot_height():
 
 def set_all_plot_heights():
     for instance_tag in plots._items.keys():
-        dpg.set_item_height(plots.get(instance_tag).graph_tag, calculate_plot_height())
+        dpg.set_item_height(plots.get(instance_tag).plot_tag, calculate_plot_height())
 
 def change_num_visible_plots(sender, app_data, user_data) -> None:
     # REFACTOR: definitely change how this is done later. max plots on screen should be a user configurable option
@@ -396,7 +375,7 @@ def add_series_to_plot_from_plot(sender, app_data, user_data):
 
     # drag and drop to the plot will add to the first Y axis dpg.mvYAxis
     parent_axis_tag = next(tag for tag, ax in pi.axis_list.items() if ax.which_axis is dpg.mvYAxis)
-    data_instance_tag = app_data.ds.instance_tag
+    data_instance_tag = app_data.ds.self_tag
     drag_data = app_data
 
     add_to_plot(plot_instance_tag, data_instance_tag, parent_axis_tag, drag_data)
@@ -423,7 +402,7 @@ def add_series_to_plot_from_axis(sender, app_data: DragPayloadColumn, user_data)
 
     # 1.
     plot_instance_tag = user_data
-    data_instance_tag = app_data.ds.instance_tag
+    data_instance_tag = app_data.ds.self_tag
     # col_name = app_data['col_name']
     # extra_params = app_data['extra_params']
     # params = {k:v for k,v in extra_params.items() if v is not None}
@@ -471,89 +450,18 @@ def add_series_to_plot_from_axis(sender, app_data: DragPayloadColumn, user_data)
 def get_plot_instance_number(instance_tag):
     return list(plots._items.keys()).index(instance_tag) + 1 # 1 indexed rather than 0 indexed
 
-# def rename_manager(sender, app_data, user_data):
-#     dropdown_selection = app_data
-#     manager_tag=user_data['manager_tag'] # is there a better way to do this than  passing the user_data?
-#     instance_tag=user_data['instance_tag']
-#     # manager_tag = dpg.get_item_parent(sender)
-#     plot_number = get_plot_instance_number(instance_tag)
-#     dpg.set_item_label(manager_tag,f'{dropdown_selection} {plot_number}')
-
-
-def delete_last_plot_instance(sender, app_data): #delete the last added plot instance, manager, and graph # TODO make a way to delete any plot
-    # delete data from dict and also ge the tag of the collapsable window
-    instance_tag, pi = plots.popitem() # key, val # TODO: should probably made a plots.delete(tag) function and make plots a class that way logic is abstracted away from the functions
-    dpg.delete_item(pi.manager_tag) # delete the options window
-    dpg.delete_item(pi.graph_tag) #delete the plot
-    set_all_plot_heights()
-
-# def select_plot_type(sender, app_data, user_data):
-#     # print(sender)
-#     # print(app_data)
-#     rename_manager(sender, app_data, user_data)
-#     show_plot_options(sender, app_data)
 
 def add_plot_axes(pi):
 
     for tag, ax in pi.axis_list.items(): # TODO: consider adding parent tag to ax so you dont have to pass thw whole pi in here
         # TODO: put a drop type str on plot axis to make sure you cant drop annotations
-        dpg.add_plot_axis(ax.which_axis, label=ax.alias, tag=ax.instance_tag, parent=ax.graph_tag,
-                          drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=ax.axis_scale_options[ax.scale],  # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
+        dpg.add_plot_axis(ax.which_axis, label=ax.alias, tag=ax.self_tag, parent=ax.plot_tag,
+                          drop_callback=add_series_to_plot_from_axis, user_data=pi.self_tag, scale=ax.axis_scale_options[ax.scale],  # TODO: this is the only call to PI. determine if we can remove the PI call from this function to narrow its scope and access
                           show=ax.show,
                           no_label = ax.no_label,
                           opposite=ax.location,
                           no_side_switch=True,
-                          no_highlight=True)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-
-
-def add_axis(sender, app_data, user_data):
-    pi = plots[user_data['instance_tag']]
-    axis = user_data['axis']
-
-    DEFAULT_Y_AXIS_LABELS = ['y1', 'y2', 'y3']
-    DEFAULT_X_AXIS_LABELS = ['x1', 'x2', 'x3']
-    DEFAULT_Y_AXIS_POSITION = [False,True,True]
-    DEFAULT_X_AXIS_POSITION = [False,False,False]
-    x_axis_constants = [dpg.mvXAxis, dpg.mvXAxis2, dpg.mvXAxis3]
-    y_axis_constants = [dpg.mvYAxis, dpg.mvYAxis2, dpg.mvYAxis3]
-    x_tags = pi.x_axis_tags
-    y_tags = pi.y_axis_tags
-
-    if axis == 'y':
-        labels= DEFAULT_Y_AXIS_LABELS
-        tags = y_tags
-        axis_constants  = y_axis_constants
-        position = DEFAULT_Y_AXIS_POSITION
-    else:
-        labels = DEFAULT_X_AXIS_LABELS
-        tags = x_tags
-        axis_constants  = x_axis_constants
-        position = DEFAULT_X_AXIS_POSITION
-
-
-    i = next((i for i,tag in enumerate(tags) if not dpg.does_item_exist(tag)), None) # todo: consider for loop instead of a generator link remove_last_axis
-    if i is None:
-        return
-    dpg.add_plot_axis(axis_constants[i], label=labels[i], tag=tags[i], opposite=position[i], parent = pi.graph_tag, drop_callback=add_series_to_plot_from_axis, user_data=pi.instance_tag, scale=dpg.mvPlotScale_Linear, no_side_switch=True, no_highlight=True) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-    # TODO: expose no-highlight in main options bar to change global behavior
-    # TODO: put a drop type str on plot axis to make sure you cant drop annotations
-
-        # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag,
-        #                   tag=y1_tag)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
-
-def remove_last_axis(sender, app_data, user_data):
-    pi = plots[user_data['instance_tag']]
-    axis = user_data['axis']
-
-    if axis == 'y':
-        tags = pi.y_axis_tags
-    else:
-        tags = pi.x_axis_tags
-
-    for tag in reversed(tags):
-        if dpg.does_item_exist(tag):
-            dpg.delete_item(tag)
-            break
+                          no_highlight=True)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload sour    #                   tag=y1_tag)  # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
 
 
 def add_new_plot_instance():
@@ -564,11 +472,11 @@ def add_new_plot_instance():
     plot_legend_tag =  dpg.generate_uuid()
     # REFACTOR: move the tag generation inside __init__ to clean things up
 
-    pi = PlotInstance(instance_tag=plot_instance_tag, manager_tag=plot_manager_tag,graph_tag=plot_graph_tag, legend_tag=plot_legend_tag)
+    pi = PlotInstance(self_tag=plot_instance_tag, manager_tag=plot_manager_tag,graph_tag=plot_graph_tag, legend_tag=plot_legend_tag)
 
     plots.add(pi)
 
-    instance_number = get_plot_instance_number(pi.instance_tag)
+    instance_number = get_plot_instance_number(pi.self_tag)
 
     pi.plot_name = f'Plot {instance_number}'
 
@@ -576,13 +484,13 @@ def add_new_plot_instance():
 
     plot_types = ('Line Plot', 'Scatter Plot', 'Histogram', 'Heatmap', 'Log Plot', 'Stem Plot')
 
-    dpg.add_button(label=pi.plot_name, width=-1, parent=Tags.plot_manager_tab, tag=pi.manager_tag, callback=configure_plot, user_data=pi)
+    dpg.add_button(label=pi.plot_name, width=-1, parent=Tags.plot_manager_tab, tag=pi.button_tag, callback=configure_plot, user_data=pi)
     #
     # with dpg.collapsing_header(parent=Tags.plot_manager_tab, default_open=True, tag=pi.manager_tag):
     #     dpg.add_combo(plot_types, default_value=plot_types[0],callback=select_plot_type, user_data=user_data) # TODO: see if theres a better way to do this now that everything is a class
     #     dpg.set_item_label(dpg.last_container(), label=f'{plot_types[0]} {instance_number}')
 
-    with dpg.plot(width=-1, parent=Tags.plot_window, tag=pi.graph_tag, no_frame=True, drop_callback=drop_item_on_plot_handler, user_data=pi.instance_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle Tags directly
+    with dpg.plot(width=-1, parent=Tags.plot_window, tag=pi.plot_tag, no_frame=True, drop_callback=drop_item_on_plot_handler, user_data=pi.self_tag):  # TODO: consider either making this dpg.uuid or wrap into a class to handle Tags directly
         dpg.add_plot_legend(tag=pi.legend_tag, no_highlight_axis=not pi.plot_options['highlight_axis_on_hover']) # TODO: amake this a config option globally in menubar
         # dpg.add_plot_axis(dpg.mvXAxis, label="x")
         # dpg.add_plot_axis(dpg.mvYAxis, label="y", drop_callback=add_to_plot, user_data=pi.instance_tag, tag=y1_tag) # TODO: really hard to figure out where the appdata comes from. I think this is what PAYLOAD TYPE is for so you can easily search around to see the payload source
@@ -596,7 +504,7 @@ def add_new_plot_instance():
 
     set_all_plot_heights()
 
-    return pi.instance_tag # return the tag of the new plot instance in Plots in case you need it
+    return pi.self_tag # return the tag of the new plot instance in Plots in case you need it
 
 
 
@@ -632,13 +540,13 @@ def configure_plot(sender, app_data, user_data):
 
     def change_plot_name_callback(sender, app_data):
         pi.plot_name = app_data
-        dpg.set_item_label(pi.graph_tag, pi.get_plot_name())
-        dpg.set_item_label(pi.manager_tag, pi.plot_name)
+        dpg.set_item_label(pi.plot_tag, pi.get_plot_name())
+        dpg.set_item_label(pi.button_tag, pi.plot_name)
 
     def set_plot_name_visibility(sender, app_data):
         pi.plot_options['show_plot_name'] = app_data
         pi.plot_name_visible =  pi.plot_options['show_plot_name']
-        dpg.set_item_label(pi.graph_tag, pi.get_plot_name())
+        dpg.set_item_label(pi.plot_tag, pi.get_plot_name())
 
     def show_legend_callback(sender, app_data):
         pi.plot_options['show_legend'] = app_data
@@ -689,24 +597,24 @@ def configure_plot(sender, app_data, user_data):
         # TODO: make this more robust. needs to check to see if a plot has been renamed first and skip if it has been. also needs to regenerate plot titles if those are visible
         for tag,ps in plots.items(): # use PS instead of PI since pi.delete fails (likely due to collapsing scope of PI forcing it into function definition)
             print(ps)
-            instance_number = get_plot_instance_number(ps.instance_tag)
+            instance_number = get_plot_instance_number(ps.self_tag)
             ps.plot_name = f'Plot {instance_number}'
-            dpg.set_item_label(ps.manager_tag,ps.plot_name)
+            dpg.set_item_label(ps.button_tag, ps.plot_name)
 
     def clear_plot():
         # clear plot just deletes the old plot and manager, creates a new one, then slots it in the same location as the old one
         manager_children = dpg.get_item_children(Tags.plot_manager_tab)[1]
         graph_children = dpg.get_item_children(Tags.plot_window)[1]
-        manager_index = manager_children.index(pi.manager_tag)
-        graph_index = graph_children.index(pi.graph_tag)
+        manager_index = manager_children.index(pi.button_tag)
+        graph_index = graph_children.index(pi.plot_tag)
         before_manager_tag = manager_children[manager_index+1] if manager_index+1 < len(manager_children) else None
         before_graph_tag = graph_children[graph_index+1] if graph_index+1 < len(graph_children) else None
         pi.delete()
         dpg.delete_item(config_window_tag)
         new_instance_tag = add_new_plot_instance()
         if before_manager_tag is not None and before_graph_tag is not None:
-            new_manager_tag = plots[new_instance_tag].manager_tag
-            new_plot_tag = plots[new_instance_tag].graph_tag
+            new_manager_tag = plots[new_instance_tag].button_tag
+            new_plot_tag = plots[new_instance_tag].plot_tag
             dpg.move_item(new_manager_tag, before=before_manager_tag)
             dpg.move_item(new_plot_tag, before=before_graph_tag)
 
@@ -792,13 +700,13 @@ def configure_plot(sender, app_data, user_data):
             return
         dpg.bind_item_theme(button_tag, deactivated_axis)
         hide_row(row_tag, False)
-        dpg.hide_item(ax.instance_tag)
+        dpg.hide_item(ax.self_tag)
         ax.show = not ax.show
 
     def disable_axis_callback(sender, app_data, user_data):
         ax, row_tag, button_tag = user_data
         dpg.set_value(sender, False)
-        dpg.delete_item(ax.instance_tag, children_only=True)
+        dpg.delete_item(ax.self_tag, children_only=True)
 
         # if not is_first_axis:
         hide_axis_callback(sender, app_data, user_data)
@@ -813,7 +721,7 @@ def configure_plot(sender, app_data, user_data):
             return
         dpg.bind_item_theme(button_tag, activated_axis)
         hide_row(row_tag, True)
-        dpg.show_item(ax.instance_tag)
+        dpg.show_item(ax.self_tag)
         ax.show = not ax.show
 
     def set_alias_callback(sender, app_data, user_data):
@@ -868,7 +776,7 @@ def configure_plot(sender, app_data, user_data):
             dpg.bind_item_theme(button_tag, activated_axis)
             ax.show = not ax.show
             hide_row(row_tag, True)
-            dpg.show_item(ax.instance_tag)
+            dpg.show_item(ax.self_tag)
 
 
     # TODO: figure out how to enforce only one window per plot at a time. consider something similar to onewindow tag made earlier
@@ -932,7 +840,7 @@ def configure_plot(sender, app_data, user_data):
                             dpg.add_text(sr.y_alias)
                             with dpg.tooltip(dpg.last_item()):
                                 dpg.add_text(sr.x_alias)
-                            dpg.add_combo(line_style, width=80,default_value=sr.style,callback=change_plot_style_callback, user_data=sr.instance_tag)
+                            dpg.add_combo(line_style, width=80, default_value=sr.style, callback=change_plot_style_callback, user_data=sr.self_tag)
                             dpg.add_button(label='Edit',width=50)
                             dpg.add_button(label='X',width=20)
                             dpg.bind_item_theme(dpg.last_item(), delete_theme)
