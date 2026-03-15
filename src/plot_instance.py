@@ -1,6 +1,5 @@
 import dearpygui.dearpygui as dpg
 import pandas as pd
-from enum import Enum
 
 from src.data_instance import DragItemType, DragPayloadColumn
 from utils import plots, sources
@@ -9,15 +8,36 @@ from tags import Tags
 from typing import Dict
 from draggables import add_annotation_to_plot, add_trim_window, TrimWindow
 from dataclasses import dataclass
+from enum import Enum
 
+class LineTypes(Enum):
+    LINE = 'Line Plot'
+    SCATTER = 'Scatter Plot'
+    HISTOGRAM = 'Histogram'
+    HEATMAP = 'Heatmap'
+    LOG_PLOT = 'Log Plot'
+    STEM_PLOT = 'Stem Plot'
 
+class AxisScale(Enum):
+    LINEAR = dpg.mvPlotScale_Linear
+    LOG = dpg.mvPlotScale_Log10
+    DATE = dpg.mvPlotScale_Time
 
-@dataclass()
+@dataclass
 class PlotProperties:
     name: str
     name_visible: bool
+    legend_visible: bool
+    highlight_axis_on_hover: bool
 
-@dataclass()
+@dataclass
+class AxisProperties:
+    name: str
+    name_visible: bool
+    render_axis: bool
+    render_opposite_side: bool
+
+@dataclass
 class AxisDefaults:
     dpg_axis_type: int
     show: bool
@@ -31,11 +51,7 @@ class AxisType(Enum):
     Y2 = AxisDefaults(dpg_axis_type = dpg.mvXAxis2, show = True, render_opposite_side = True)
     Y3 = AxisDefaults(dpg_axis_type = dpg.mvXAxis3, show = False, render_opposite_side = False)
 
-class AxisScale(Enum):
-    LINEAR = dpg.mvPlotScale_Linear
-    LOG = dpg.mvPlotScale_Log10
-    DATE = dpg.mvPlotScale_Time
-#
+
 class PlotInstance:
     def __init__(self):
         self.self_tag = Tags.generate()
@@ -47,11 +63,15 @@ class PlotInstance:
         self.axis_list: Dict[int, AxisInstance] = self._init_axis_list()
         self.series_list: Dict[int, SeriesInstance] = {}
         self.trim_list: Dict[int, TrimWindow] = {}
-
-        self.plot_name = None
-        self.plot_name_visible = False
+        #
+        # self.plot_name = None
+        # self.plot_name_visible = False
         # OR THIS
-        self.plot_properties = PlotProperties(name = '', name_visible = False)
+        self.plot_properties = PlotProperties(name='',
+                                              name_visible=False,
+                                              legend_visible=True,
+                                              highlight_axis_on_hover=True)
+
 
     def _init_axis_list(self) -> Dict[int, 'AxisInstance']:
         axis_list = {}
@@ -68,8 +88,52 @@ class AxisInstance:
 
         self.axis_type = axis_type
         self.dpg_axis_type = axis_type.value.dpg_axis_type
-        self.show = axis_type.value.show
-        self.render_opposite_side = axis_type.value.render_opposite_side
+        # self.show = axis_type.value.show
+        # self.render_opposite_side = axis_type.value.render_opposite_side
+        self.properties  = AxisProperties(name='',
+                                          name_visible=False,
+                                          render_axis=axis_type.value.show,
+                                          render_opposite_side=axis_type.value.render_opposite_side)
+
+
+@dataclass()
+class SeriesNames():
+    file_name: str
+    file_alias: str
+    x_col_header: str
+    x_col_alias: str
+    y_col_header: str
+    y_col_alias: str
+    display_name: str # can be y_alias, or file_alias+y_alias
+
+
+class SeriesInstance: # TODO: consider renaming to LineInstance
+
+    def __init__(self):
+
+        self.self_tag = None
+        self.parent_axis_tag = None
+        self.x_df = None
+        self.y_df = None
+        self.x_vals_full = None
+        self.y_vals_full = None
+        self.params = None
+        self.line_type = LineTypes.LINE
+        self.downsample_amount = None
+
+    @property
+    def x_vals(self):
+        return self.downsample(self.x_vals_full)
+
+    @property
+    def y_vals(self):
+        return self.downsample(self.y_vals_full)
+
+    @staticmethod
+    def downsample(vals):
+        return vals
+
+
 
 
 

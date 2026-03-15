@@ -333,9 +333,9 @@ with dpg.window(label='Import Configurator', width=500, height=700, modal=True, 
         dpg.add_button(label="IMPORT", callback=lambda: dpg.hide_item(Tags.import_config))
         dpg.add_button(label="Cancel")
 
-add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
+# add_data_to_sources(None, app_data = {'file_path_name': 'C:\\Users\\tyler\\Downloads\\exampleData1.csv'})
 # add_data_to_sources(None, {'file_path_name': '/Users/tyler/Downloads/test_data2.csv'})
-# add_data_to_sources(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'})
+add_data_to_sources(None, {'file_path_name': '/Users/tyler/Documents/repos/timesink/test_data1.csv'})
 
 # dpg.show_debug()
 dpg.set_viewport_resize_callback(set_all_plot_heights)

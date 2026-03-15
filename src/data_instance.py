@@ -8,7 +8,7 @@ from tags import Tags
 from utils import sources, DragItemType
 
 @dataclass
-class ColumnParams: # addition attributes can be assigned to any column
+class ColumnParams: # additional attributes can be assigned to any column
     alt_x_axis: str | None = None
     axis_style: str | None = None
     histogram_bins: int = None
@@ -33,7 +33,7 @@ class DataInstance:
         self.df = self._create_dataframe(file_path, quick_format_options)
         self.x_axis_header = self.df.columns[0]
         self._header_to_alias: Dict[str,str] = {header: header for header in self.df.columns}
-        self._all_column_params: Dict[str, ColumnParams] = {name: ColumnParams() for name in self.df.columns}
+        self._all_column_params: Dict[str, ColumnParams] = {header: ColumnParams() for header in self.df.columns}
 
 
     @property
@@ -88,7 +88,7 @@ class DataInstance:
 
     def drag_and_drop_column(self, col_header) -> DragPayloadColumn:
         return DragPayloadColumn(ds=self,
-                                 col_header_to_plot=col_header,
+                                 col_header_to_plot=col_header, # TODO: decide if to just bundle y_col_geader and x_col_header explicitly for better clarity in other modules
                                  params=self._all_column_params[col_header],
                                  type=DragItemType.DATA)
 
